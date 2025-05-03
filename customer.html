@@ -293,28 +293,51 @@
 }
 
     // แก้ไขฟังก์ชัน loadInitialData
-    async function loadInitialData() {
-      showSpinner();
-      try {
-        const promoData = await fetchData('getPromotions');
-        document.getElementById('promoContent').innerHTML = promoData.length > 0 ? 
-          promoData.slice(1).map(function(p, idx) {
-            var title = p[1] || 'ไม่มีชื่อ';
-            var desc = p[2] || 'ไม่มีรายละเอียด';
-            var img = p[3] || 'https://via.placeholder.com/300x150?text=ไม่มีรูปภาพ';
-            return '<div class="carousel-item ' + (idx === 0 ? 'active' : '') + '">' +
-                   '<img src="' + img + '" class="d-block w-100" alt="' + title + '">' +
-                   '<div class="carousel-caption d-none d-md-block">' +
-                   '<h5>' + title + '</h5>' +
-                   '<p>' + desc + '</p>' +
-                   '</div></div>';
-          }).join('') : '<div class="carousel-item active"><p class="text-center py-5">ไม่มีโปรโมชั่น</p></div>';
-      } catch (err) {
-        Swal.fire('ข้อผิดพลาด', err.message || 'ไม่สามารถโหลดโปรโมชั่นได้', 'error');
-      } finally {
-        hideSpinner();
-      }
+    // แก้ไขฟังก์ชัน loadInitialData เพื่อแสดงข้อผิดพลาดอย่างชัดเจน
+async function loadInitialData() {
+  showSpinner();
+  try {
+    const promoData = await fetchData('getPromotions');
+    
+    if (!promoData || !Array.isArray(promoData)) {
+      throw new Error('รูปแบบข้อมูลไม่ถูกต้อง');
     }
+
+    const promoContent = document.getElementById('promoContent');
+    if (promoData.length <= 1) {
+      promoContent.innerHTML = '<div class="carousel-item active"><p class="text-center py-5">ไม่มีโปรโมชั่นในขณะนี้</p></div>';
+      return;
+    }
+
+    promoContent.innerHTML = promoData.slice(1).map((p, idx) => {
+      const title = p[1] || 'ไม่มีชื่อ';
+      const desc = p[2] || 'ไม่มีรายละเอียด';
+      const img = p[3] || 'https://via.placeholder.com/300x150?text=ไม่มีรูปภาพ';
+      
+      return `
+        <div class="carousel-item ${idx === 0 ? 'active' : ''}">
+          <img src="${img}" class="d-block w-100" alt="${title}">
+          <div class="carousel-caption d-none d-md-block">
+            <h5>${title}</h5>
+            <p>${desc}</p>
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+  } catch (err) {
+    console.error('Failed to load promotions:', err);
+    document.getElementById('promoContent').innerHTML = `
+      <div class="carousel-item active">
+        <div class="alert alert-danger m-3">
+          ไม่สามารถโหลดข้อมูลโปรโมชั่นได้: ${err.message}
+        </div>
+      </div>
+    `;
+  } finally {
+    hideSpinner();
+  }
+}
 
     // ฟังก์ชันเกี่ยวกับตำแหน่ง
     function getCustomerLocation() {
