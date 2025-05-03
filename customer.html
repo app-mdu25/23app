@@ -156,6 +156,11 @@
       .cart-button span { font-size: 12px; }
       .login-status { top: 10px; right: 10px; font-size: 0.8em; }
     }
+    @media (max-width: 576px) {
+      .login-status { font-size: 0.7em; top: 5px; right: 5px; }
+      .cart-button { width: 45px; height: 45px; }
+      .cart-button span { font-size: 10px; }
+    }
   </style>
 </head>
 <body>
@@ -234,7 +239,7 @@
           <input id="phone" class="form-control mb-3" placeholder="เบอร์โทร" aria-label="เบอร์โทรศัพท์">
           <input id="lineId" class="form-control mb-3" placeholder="LINE ID" aria-label="LINE ID" readonly>
           <div class="input-group mb-3">
-            <input id="location" class="form-control" placeholder="พิกัด (ดึงอัตโนมัติ)" aria-label="พิกัด">
+            <input id="location" class="form-control" placeholder="พิกัดหรือที่อยู่" aria-label="พิกัด">
             <button class="btn btn-outline-secondary" onclick="getCustomerLocation()">ดึงพิกัดใหม่</button>
           </div>
         </div>
@@ -258,17 +263,31 @@
     function showSpinner() { document.getElementById('spinner').style.display = 'block'; }
     function hideSpinner() { document.getElementById('spinner').style.display = 'none'; }
 
+    function convertDriveUrl(url) {
+      if (url && url.includes('drive.google.com/file/d/')) {
+        const fileIdMatch = url.match(/file\/d\/(.+?)\//);
+        return fileIdMatch ? `https://drive.google.com/uc?export=view&id=${fileIdMatch[1]}` : url;
+      }
+      return url || 'https://via.placeholder.com/200x200?text=No+Image';
+    }
+
     async function callApi(action, data) {
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // Timeout 10 วินาที
         const response = await fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action, ...data })
+          body: JSON.stringify({ action, ...data }),
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
         const result = await response.json();
         if (result.error) throw new Error(result.error);
         return result;
       } catch (err) {
+        hideSpinner();
+        Swal.fire('ข้อผิดพลาด', err.message || 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้', 'error');
         throw err;
       }
     }
@@ -312,25 +331,25 @@
     }
 
     function getCustomerLocation() {
-      if (navigator.geolocation) {
-        showSpinner();
-        navigator.geolocation.getCurrentPosition(
-          position => {
-            const location = position.coords.latitude + ',' + position.coords.longitude;
-            document.getElementById('location').value = location;
-            hideSpinner();
-          },
-          error => {
-            Swal.fire('ข้อผิดพลาด', 'ไม่สามารถดึงพิกัดได้ กรุณากรอกเอง', 'warning');
-            document.getElementById('location').value = '';
-            hideSpinner();
-          },
-          { timeout: 10000, enableHighAccuracy: true }
-        );
-      } else {
-        Swal.fire('ข้อผิดพลาด', 'เบราว์เซอร์ไม่รองรับ Geolocation', 'error');
-        document.getElementById('location').value = '';
+      if (!navigator.geolocation) {
+        Swal.fire('คำเตือน', 'เบราว์เซอร์ไม่รองรับ Geolocation กรุณากรอกพิกัดหรือที่อยู่', 'warning');
+        document.getElementById('location').placeholder = 'กรุณากรอกพิกัดหรือที่อยู่';
+        return;
       }
+      showSpinner();
+      navigator.geolocation.getCurrentPosition(
+        position => {
+          const location = position.coords.latitude + ',' + position.coords.longitude;
+          document.getElementById('location').value = location;
+          hideSpinner();
+        },
+        error => {
+          Swal.fire('ข้อผิดพลาด', 'ไม่สามารถดึงพิกัดได้ กรุณากรอกพิกัดหรือที่อยู่', 'warning');
+          document.getElementById('location').placeholder = 'กรุณากรอกพิกัดหรือที่อยู่';
+          hideSpinner();
+        },
+        { timeout: 10000, enableHighAccuracy: true }
+      );
     }
 
     async function loadInitialData() {
@@ -338,18 +357,22 @@
       try {
         const data = await callApi('getSheetData', { sheetName: 'Promotions' });
         var promoData = Array.isArray(data) && data.length > 0 ? data.slice(1) : [];
-        document.getElementById('promoContent').innerHTML = promoData.length > 0 ? 
-          promoData.map(function(p, idx) {
-            var title = p[1] || 'ไม่มีชื่อ';
-            var desc = p[2] || 'ไม่มีรายละเอียด';
-            var img = p[3] || 'https://via.placeholder.com/300x150?text=ไม่มีรูปภาพ';
-            return '<div class="carousel-item ' + (idx === 0 ? 'active' : '') + '">' +
-                   '<img src="' + img + '" class="d-block w-100" alt="' + title + '">' +
-                   '<div class="carousel-caption d-none d-md-block">' +
-                   '<h5>' + title + '</h5>' +
-                   '<p>' + desc + '</p>' +
-                   '</div></div>';
-          }).join('') : '<div class="carousel-item active"><p class="text-center py-5">ไม่มีโปรโมชั่น</p></div>';
+        if (promoData.length === 0) {
+          document.getElementById('promoCarousel').style.display = 'none';
+          hideSpinner();
+          return;
+        }
+        document.getElementById('promoContent').innerHTML = promoData.map(function(p, idx) {
+          var title = p[1] || 'ไม่มีชื่อ';
+          var desc = p[2] || 'ไม่มีรายละเอียด';
+          var img = convertDriveUrl(p[3]);
+          return '<div class="carousel-item ' + (idx === 0 ? 'active' : '') + '">' +
+                 '<img src="' + img + '" class="d-block w-100" alt="' + title + '">' +
+                 '<div class="carousel-caption d-none d-md-block">' +
+                 '<h5>' + title + '</h5>' +
+                 '<p>' + desc + '</p>' +
+                 '</div></div>';
+        }).join('');
         hideSpinner();
       } catch (err) {
         Swal.fire('ข้อผิดพลาด', err.message || 'ไม่สามารถโหลดโปรโมชั่นได้', 'error');
@@ -367,11 +390,7 @@
         var categoryData = Array.isArray(data) && data.length > 0 ? data.slice(1) : [];
         document.getElementById('selectionGrid').innerHTML = categoryData.length > 0 ? 
           categoryData.map(function(c) {
-            var imageUrl = c[2] && c[2].trim() !== '' ? c[2] : 'https://via.placeholder.com/200x200?text=No+Image';
-            if (imageUrl.includes('drive.google.com/file/d/')) {
-              var fileIdMatch = imageUrl.match(/file\/d\/(.+?)\//);
-              if (fileIdMatch && fileIdMatch[1]) imageUrl = 'https://drive.google.com/uc?export=view&id=' + fileIdMatch[1];
-            }
+            var imageUrl = convertDriveUrl(c[2]);
             return '<div class="selection-card" onclick="loadProductsByCategory(\'' + c[0] + '\')">' +
                    '<img src="' + imageUrl + '" alt="' + c[1] + '" onerror="this.src=\'https://via.placeholder.com/200x200?text=Image+Error\'">' +
                    '<div class="card-body"><h6 class="card-title">' + c[1] + '</h6></div></div>';
@@ -393,8 +412,9 @@
         var storeData = Array.isArray(data) && data.length > 0 ? data.slice(1) : [];
         document.getElementById('selectionGrid').innerHTML = storeData.length > 0 ? 
           storeData.map(function(s) {
+            var imageUrl = convertDriveUrl(s[2]);
             return '<div class="selection-card" onclick="loadProductsByStore(\'' + s[0] + '\')">' +
-                   '<img src="' + s[2] + '" alt="' + s[1] + '" onerror="this.src=\'https://via.placeholder.com/200x200?text=Image+Error\'">' +
+                   '<img src="' + imageUrl + '" alt="' + s[1] + '" onerror="this.src=\'https://via.placeholder.com/200x200?text=Image+Error\'">' +
                    '<div class="card-body"><h6 class="card-title">' + s[1] + '</h6></div></div>';
           }).join('') : '<p class="text-center">ไม่มีร้านค้า</p>';
         hideSpinner();
@@ -413,8 +433,9 @@
         var productData = Array.isArray(data) && data.length > 0 ? data.slice(1) : [];
         document.getElementById('productGrid').innerHTML = productData.length > 0 ? 
           productData.filter(p => p[2] === categoryId).map(p => {
+            var imageUrl = convertDriveUrl(p[5]);
             return `<div class="product-card">
-                   <img src="${p[5]}" alt="${p[3]}" onerror="this.src='https://via.placeholder.com/180x180?text=Image+Error'">
+                   <img src="${imageUrl}" alt="${p[3]}" onerror="this.src='https://via.placeholder.com/180x180?text=Image+Error'">
                    <div class="card-body">
                    <h5 class="card-title">${p[3]}</h5>
                    <p class="card-text">${p[4]} บาท</p>
@@ -440,8 +461,9 @@
         var productData = Array.isArray(data) && data.length > 0 ? data.slice(1) : [];
         document.getElementById('productGrid').innerHTML = productData.length > 0 ? 
           productData.filter(p => p[1] === storeId).map(p => {
+            var imageUrl = convertDriveUrl(p[5]);
             return `<div class="product-card">
-                   <img src="${p[5]}" alt="${p[3]}" onerror="this.src='https://via.placeholder.com/180x180?text=Image+Error'">
+                   <img src="${imageUrl}" alt="${p[3]}" onerror="this.src='https://via.placeholder.com/180x180?text=Image+Error'">
                    <div class="card-body">
                    <h5 class="card-title">${p[3]}</h5>
                    <p class="card-text">${p[4]} บาท</p>
@@ -462,6 +484,11 @@
       qty = parseInt(qty);
       if (qty < 1 || qty > item.stock) {
         Swal.fire('ข้อผิดพลาด', `จำนวนต้องอยู่ระหว่าง 1-${item.stock}`, 'error');
+        return;
+      }
+      const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
+      if (totalQty + qty > 100) {
+        Swal.fire('ข้อผิดพลาด', 'จำนวนสินค้าในตะกร้าเกินขีดจำกัด (สูงสุด 100 ชิ้น)', 'error');
         return;
       }
       if (cart.length >= 10 && !cart.find(i => i.id === item.id)) {
@@ -516,7 +543,7 @@
         return;
       }
       if (!userLineId) {
-        Swal.fire('ข้อผิดพลาด', 'กรุณาล็อกอินด้วย LINE ก่อนสั่งซื้อ', 'warning');
+        Swan.fire('ข้อผิดพลาด', 'กรุณาล็อกอินด้วย LINE ก่อนสั่งซื้อ', 'warning');
         return;
       }
       cartModal.hide();
@@ -564,5 +591,5 @@
       getCustomerLocation();
     };
   </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'939e55654a8c6772',t:'MTc0NjI2MDM2OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
