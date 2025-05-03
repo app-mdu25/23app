@@ -243,10 +243,12 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     // กำหนดค่า API URL
-    const API_URL = 'https://script.google.com/macros/s/AKfycbyfWdBByx9KmgvNoR7c-TvjxqzpPV3o-5ogoEfEKsDR4KHMVL89yajqJXtiIaxDVR7QZw/exec?view=customer';
+  <script>
+    // กำหนดค่า API URL - แทนที่ YOUR_WEB_APP_ID ด้วย ID ของคุณ
+    const API_URL = 'https://script.google.com/macros/s/AKfycbwLKK1cecAjowRVm_YGInxB6dG2cTjXTw1DwcHeyRz_gzTDcFdJ-6Sw7uhBNjGWC4JyzQ/exec';
     
     let cart = [];
     let liffInitialized = false;
@@ -258,7 +260,7 @@
     function showSpinner() { document.getElementById('spinner').style.display = 'block'; }
     function hideSpinner() { document.getElementById('spinner').style.display = 'none'; }
 
-    // ฟังก์ชันสำหรับเรียก API
+    // ฟังก์ชันสำหรับเรียก API แบบใหม่
     async function fetchData(action, data = {}) {
       try {
         const response = await fetch(API_URL, {
@@ -282,37 +284,27 @@
       }
     }
 
-    // ฟังก์ชัน LIFF
-    async function initializeLiff() {
+    // แก้ไขฟังก์ชัน loadInitialData
+    async function loadInitialData() {
+      showSpinner();
       try {
-        await liff.init({ liffId: '2007361885-2A7QmoJ4' });
-        liffInitialized = true;
-        
-        if (liff.isLoggedIn()) {
-          const profile = await liff.getProfile();
-          lineProfile = {
-            userId: profile.userId,
-            displayName: profile.displayName
-          };
-          
-          document.getElementById('lineId').value = profile.userId;
-          
-          if (profile.displayName) {
-            document.getElementById('customerName').value = profile.displayName;
-          }
-        }
-      } catch (error) {
-        console.error('LIFF initialization error:', error);
-      }
-    }
-
-    async function loginWithLine() {
-      if (!liffInitialized) {
-        await initializeLiff();
-      }
-      
-      if (!liff.isLoggedIn()) {
-        liff.login();
+        const promoData = await fetchData('getPromotions');
+        document.getElementById('promoContent').innerHTML = promoData.length > 0 ? 
+          promoData.slice(1).map(function(p, idx) {
+            var title = p[1] || 'ไม่มีชื่อ';
+            var desc = p[2] || 'ไม่มีรายละเอียด';
+            var img = p[3] || 'https://via.placeholder.com/300x150?text=ไม่มีรูปภาพ';
+            return '<div class="carousel-item ' + (idx === 0 ? 'active' : '') + '">' +
+                   '<img src="' + img + '" class="d-block w-100" alt="' + title + '">' +
+                   '<div class="carousel-caption d-none d-md-block">' +
+                   '<h5>' + title + '</h5>' +
+                   '<p>' + desc + '</p>' +
+                   '</div></div>';
+          }).join('') : '<div class="carousel-item active"><p class="text-center py-5">ไม่มีโปรโมชั่น</p></div>';
+      } catch (err) {
+        Swal.fire('ข้อผิดพลาด', err.message || 'ไม่สามารถโหลดโปรโมชั่นได้', 'error');
+      } finally {
+        hideSpinner();
       }
     }
 
@@ -372,13 +364,9 @@
         const categoryData = await fetchData('getCategories');
         document.getElementById('selectionGrid').innerHTML = categoryData.length > 0 ? 
           categoryData.slice(1).map(function(c) {
-            var imageUrl = c[2] && c[2].trim() !== '' ? c[2] : 'https://via.placeholder.com/200x200?text=No+Image';
-            if (imageUrl.includes('drive.google.com/file/d/')) {
-              var fileIdMatch = imageUrl.match(/file\/d\/(.+?)\//);
-              if (fileIdMatch && fileIdMatch[1]) imageUrl = 'https://drive.google.com/uc?export=view&id=' + fileIdMatch[1];
-            }
+            var imageUrl = c[2] || 'https://via.placeholder.com/200x200?text=No+Image';
             return '<div class="selection-card" onclick="loadProductsByCategory(\'' + c[0] + '\')">' +
-                   '<img src="' + imageUrl + '" alt="' + c[1] + '" onerror="this.src=\'https://via.placeholder.com/200x200?text=Image+Error\'">' +
+                   '<img src="' + imageUrl + '" alt="' + c[1] + '">' +
                    '<div class="card-body"><h6 class="card-title">' + c[1] + '</h6></div></div>';
           }).join('') : '<p class="text-center">ไม่มีกลุ่มสินค้า</p>';
       } catch (err) {
@@ -532,13 +520,9 @@
         items: cart
       };
       
+      // ตรวจสอบข้อมูล
       if (!orderData.customerName || !orderData.phone || !orderData.lineId || !orderData.location) {
         Swal.fire('ข้อผิดพลาด', 'กรุณากรอกข้อมูลให้ครบ', 'error');
-        return;
-      }
-      
-      if (!/^\d{10}$/.test(orderData.phone)) {
-        Swal.fire('ข้อผิดพลาด', 'เบอร์โทรต้องเป็นตัวเลข 10 หลัก', 'error');
         return;
       }
       
@@ -547,15 +531,12 @@
         const orderId = await fetchData('saveOrder', {orderData});
         Swal.fire('สำเร็จ', 'คำสั่งซื้อ #' + orderId + ' ส่งแล้ว!', 'success');
         resetCart();
+        // ล้างฟอร์ม
         document.getElementById('customerName').value = '';
         document.getElementById('phone').value = '';
         document.getElementById('lineId').value = '';
         document.getElementById('location').value = '';
         orderModal.hide();
-        
-        if (liffInitialized && liff.isInClient()) {
-          liff.closeWindow();
-        }
       } catch (err) {
         Swal.fire('ข้อผิดพลาด', err.message || 'ไม่สามารถส่งคำสั่งซื้อได้', 'error');
       } finally {
@@ -564,8 +545,7 @@
     }
 
     // เริ่มต้นแอปพลิเคชัน
-    window.onload = async function() {
-      await initializeLiff();
+    window.onload = function() {
       loadInitialData();
       getCustomerLocation();
     };
