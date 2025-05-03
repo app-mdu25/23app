@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
@@ -155,6 +155,8 @@
     <header class="mb-4 text-center">
       <h1 class="display-5 fw-bold">23 ปันสุข</h1>
       <p class="text-light">สั่งซื้อสะดวก ส่งถึงที่</p>
+      <button id="lineLoginBtn" class="btn btn-success mt-2" style="display: none;">ล็อกอินด้วย LINE</button>
+      <p id="userProfile" class="mt-2"></p>
     </header>
 
     <div id="spinner" class="spinner" style="display: none;"></div>
@@ -219,19 +221,11 @@
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <div class="mb-3 text-center">
-            <button class="btn btn-success" onclick="loginWithLine()">
-              <i class="bi bi-line"></i> ล็อกอินด้วย LINE
-            </button>
-            <small class="d-block mt-2 text-muted">ล็อกอินเพื่อกรอกข้อมูลอัตโนมัติ</small>
-          </div>
-          
-          <input id="customerName" class="form-control mb-3" placeholder="ชื่อ" aria-label="ชื่อลูกค้า" required>
-          <input id="phone" class="form-control mb-3" placeholder="เบอร์โทร" aria-label="เบอร์โทรศัพท์" required>
-          <input id="lineId" class="form-control mb-3" placeholder="LINE ID" aria-label="LINE ID" readonly required>
-          
+          <input id="customerName" class="form-control mb-3" placeholder="ชื่อ" aria-label="ชื่อลูกค้า">
+          <input id="phone" class="form-control mb-3" placeholder="เบอร์โทร" aria-label="เบอร์โทรศัพท์">
+          <input id="lineId" class="form-control mb-3" readonly placeholder="LINE ID (ดึงจาก LINE Login)" aria-label="LINE ID">
           <div class="input-group mb-3">
-            <input id="location" class="form-control" placeholder="พิกัด (ดึงอัตโนมัติ)" aria-label="พิกัด" required>
+            <input id="location" class="form-control" placeholder="พิกัด (ดึงอัตโนมัติ)" aria-label="พิกัด">
             <button class="btn btn-outline-secondary" onclick="getCustomerLocation()">ดึงพิกัดใหม่</button>
           </div>
         </div>
@@ -243,103 +237,35 @@
     </div>
   </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    // กำหนดค่า API URL
-  <script>
-    // กำหนดค่า API URL - แทนที่ YOUR_WEB_APP_ID ด้วย ID ของคุณ
-    const API_URL = 'https://script.google.com/macros/s/AKfycbxMCMktZ587jN20APcBO0MfoEG2M3WBwj4vhkVUjB9VdshGmrB10M0Ty_KKcDaqXm4LcQ/exec';
-    
     let cart = [];
-    let liffInitialized = false;
-    let lineProfile = null;
+    let userLineId = '';
     const cartModal = new bootstrap.Modal(document.getElementById('cartModal'));
     const orderModal = new bootstrap.Modal(document.getElementById('orderModal'));
+    const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbzdXgIYmN-6EogtM2UqqevQTw3hSZ75DzoTu-Gl4AwKkturKSDg1MrUuViJCzW6DZG4/exec'; // แทนที่ด้วย URL จาก Web App Deployment
 
-    // ฟังก์ชันใช้งานทั่วไป
     function showSpinner() { document.getElementById('spinner').style.display = 'block'; }
     function hideSpinner() { document.getElementById('spinner').style.display = 'none'; }
 
-    // ฟังก์ชันสำหรับเรียก API แบบใหม่
-   async function fetchData(action, data = {}) {
-  try {
-    const fullUrl = `${API_URL}?action=${encodeURIComponent(action)}`;
-    const response = await fetch(fullUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-
-    // ตรวจสอบว่า response เป็น JSON จริงหรือไม่
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      const text = await response.text();
-      throw new Error(`Invalid response: ${text.substring(0, 100)}`);
+    // Initialize LIFF
+    async function initializeLiff() {
+      try {
+        await liff.init({ liffId: '2007361885-2A7QmoJ4' }); // แทนที่ด้วย LIFF ID จาก LINE Developers Console
+        if (!liff.isLoggedIn()) {
+          document.getElementById('lineLoginBtn').style.display = 'block';
+          document.getElementById('lineLoginBtn').onclick = () => liff.login();
+        } else {
+          const profile = await liff.getProfile();
+          userLineId = profile.userId;
+          document.getElementById('userProfile').innerText = `ยินดีต้อนรับ, ${profile.displayName}`;
+          document.getElementById('lineId').value = userLineId;
+        }
+      } catch (e) {
+        Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเริ่มต้น LIFF ได้: ' + e.message, 'error');
+      }
     }
 
-    const result = await response.json();
-    
-    if (!result.success) {
-      throw new Error(result.error || 'Request failed');
-    }
-    
-    return result.data;
-  } catch (error) {
-    console.error('API Error:', error);
-    throw new Error(`การเชื่อมต่อกับเซิร์ฟเวอร์มีปัญหา: ${error.message}`);
-  }
-}
-
-    // แก้ไขฟังก์ชัน loadInitialData
-    // แก้ไขฟังก์ชัน loadInitialData เพื่อแสดงข้อผิดพลาดอย่างชัดเจน
-async function loadInitialData() {
-  showSpinner();
-  try {
-    const promoData = await fetchData('getPromotions');
-    
-    if (!promoData || !Array.isArray(promoData)) {
-      throw new Error('รูปแบบข้อมูลไม่ถูกต้อง');
-    }
-
-    const promoContent = document.getElementById('promoContent');
-    if (promoData.length <= 1) {
-      promoContent.innerHTML = '<div class="carousel-item active"><p class="text-center py-5">ไม่มีโปรโมชั่นในขณะนี้</p></div>';
-      return;
-    }
-
-    promoContent.innerHTML = promoData.slice(1).map((p, idx) => {
-      const title = p[1] || 'ไม่มีชื่อ';
-      const desc = p[2] || 'ไม่มีรายละเอียด';
-      const img = p[3] || 'https://via.placeholder.com/300x150?text=ไม่มีรูปภาพ';
-      
-      return `
-        <div class="carousel-item ${idx === 0 ? 'active' : ''}">
-          <img src="${img}" class="d-block w-100" alt="${title}">
-          <div class="carousel-caption d-none d-md-block">
-            <h5>${title}</h5>
-            <p>${desc}</p>
-          </div>
-        </div>
-      `;
-    }).join('');
-    
-  } catch (err) {
-    console.error('Failed to load promotions:', err);
-    document.getElementById('promoContent').innerHTML = `
-      <div class="carousel-item active">
-        <div class="alert alert-danger m-3">
-          ไม่สามารถโหลดข้อมูลโปรโมชั่นได้: ${err.message}
-        </div>
-      </div>
-    `;
-  } finally {
-    hideSpinner();
-  }
-}
-
-    // ฟังก์ชันเกี่ยวกับตำแหน่ง
     function getCustomerLocation() {
       if (navigator.geolocation) {
         showSpinner();
@@ -362,124 +288,106 @@ async function loadInitialData() {
       }
     }
 
-    // ฟังก์ชันเกี่ยวกับข้อมูล
-    async function loadInitialData() {
-      showSpinner();
+    async function fetchSheetData(sheetName) {
       try {
-        const promoData = await fetchData('getPromotions');
-        document.getElementById('promoContent').innerHTML = promoData.length > 0 ? 
-          promoData.slice(1).map(function(p, idx) {
-            var title = p[1] || 'ไม่มีชื่อ';
-            var desc = p[2] || 'ไม่มีรายละเอียด';
-            var img = p[3] || 'https://via.placeholder.com/300x150?text=ไม่มีรูปภาพ';
-            return '<div class="carousel-item ' + (idx === 0 ? 'active' : '') + '">' +
-                   '<img src="' + img + '" class="d-block w-100" alt="' + title + '">' +
-                   '<div class="carousel-caption d-none d-md-block">' +
-                   '<h5>' + title + '</h5>' +
-                   '<p>' + desc + '</p>' +
-                   '</div></div>';
-          }).join('') : '<div class="carousel-item active"><p class="text-center py-5">ไม่มีโปรโมชั่น</p></div>';
+        showSpinner();
+        const response = await fetch(`${appsScriptUrl}?action=getSheetData&sheetName=${sheetName}`);
+        const data = await response.json();
+        if (data.error) throw new Error(data.error);
+        return data;
       } catch (err) {
-        Swal.fire('ข้อผิดพลาด', err.message || 'ไม่สามารถโหลดโปรโมชั่นได้', 'error');
+        Swal.fire('ข้อผิดพลาด', err.message || 'ไม่สามารถโหลดข้อมูลได้', 'error');
+        return [];
       } finally {
         hideSpinner();
       }
+    }
+
+    async function loadInitialData() {
+      const promoData = await fetchSheetData('Promotions');
+      document.getElementById('promoContent').innerHTML = promoData.length > 1 ? 
+        promoData.slice(1).map((p, idx) => {
+          const title = p[1] || 'ไม่มีชื่อ';
+          const desc = p[2] || 'ไม่มีรายละเอียด';
+          const img = p[3] || 'https://via.placeholder.com/300x150?text=ไม่มีรูปภาพ';
+          return `<div class="carousel-item ${idx === 0 ? 'active' : ''}">
+                  <img src="${img}" class="d-block w-100" alt="${title}">
+                  <div class="carousel-caption d-none d-md-block">
+                  <h5>${title}</h5>
+                  <p>${desc}</p>
+                  </div></div>`;
+        }).join('') : '<div class="carousel-item active"><p class="text-center py-5">ไม่มีโปรโมชั่น</p></div>';
     }
 
     async function showCategories() {
       document.getElementById('initialSelection').style.display = 'none';
       document.getElementById('selectionGrid').style.display = 'grid';
       document.getElementById('productGrid').style.display = 'none';
-      showSpinner();
-      try {
-        const categoryData = await fetchData('getCategories');
-        document.getElementById('selectionGrid').innerHTML = categoryData.length > 0 ? 
-          categoryData.slice(1).map(function(c) {
-            var imageUrl = c[2] || 'https://via.placeholder.com/200x200?text=No+Image';
-            return '<div class="selection-card" onclick="loadProductsByCategory(\'' + c[0] + '\')">' +
-                   '<img src="' + imageUrl + '" alt="' + c[1] + '">' +
-                   '<div class="card-body"><h6 class="card-title">' + c[1] + '</h6></div></div>';
-          }).join('') : '<p class="text-center">ไม่มีกลุ่มสินค้า</p>';
-      } catch (err) {
-        Swal.fire('ข้อผิดพลาด', err.message || 'ไม่สามารถโหลดกลุ่มสินค้าได้', 'error');
-      } finally {
-        hideSpinner();
-      }
+      const categoryData = await fetchSheetData('Categories');
+      document.getElementById('selectionGrid').innerHTML = categoryData.length > 1 ? 
+        categoryData.slice(1).map(c => {
+          let imageUrl = c[2] && c[2].trim() !== '' ? c[2] : 'https://via.placeholder.com/200x200?text=No+Image';
+          if (imageUrl.includes('drive.google.com/file/d/')) {
+            const fileIdMatch = imageUrl.match(/file\/d\/(.+?)\//);
+            if (fileIdMatch && fileIdMatch[1]) imageUrl = 'https://drive.google.com/uc?export=view&id=' + fileIdMatch[1];
+          }
+          return `<div class="selection-card" onclick="loadProductsByCategory('${c[0]}')">
+                  <img src="${imageUrl}" alt="${c[1]}" onerror="this.src='https://via.placeholder.com/200x200?text=Image+Error'">
+                  <div class="card-body"><h6 class="card-title">${c[1]}</h6></div></div>`;
+        }).join('') : '<p class="text-center">ไม่มีกลุ่มสินค้า</p>';
     }
 
     async function showStores() {
       document.getElementById('initialSelection').style.display = 'none';
       document.getElementById('selectionGrid').style.display = 'grid';
       document.getElementById('productGrid').style.display = 'none';
-      showSpinner();
-      try {
-        const storeData = await fetchData('getStores');
-        document.getElementById('selectionGrid').innerHTML = storeData.length > 0 ? 
-          storeData.slice(1).map(function(s) {
-            return '<div class="selection-card" onclick="loadProductsByStore(\'' + s[0] + '\')">' +
-                   '<img src="' + s[2] + '" alt="' + s[1] + '" onerror="this.src=\'https://via.placeholder.com/200x200?text=Image+Error\'">' +
-                   '<div class="card-body"><h6 class="card-title">' + s[1] + '</h6></div></div>';
-          }).join('') : '<p class="text-center">ไม่มีร้านค้า</p>';
-      } catch (err) {
-        Swal.fire('ข้อผิดพลาด', err.message || 'ไม่สามารถโหลดร้านค้าได้', 'error');
-      } finally {
-        hideSpinner();
-      }
+      const storeData = await fetchSheetData('Stores');
+      document.getElementById('selectionGrid').innerHTML = storeData.length > 1 ? 
+        storeData.slice(1).map(s => {
+          return `<div class="selection-card" onclick="loadProductsByStore('${s[0]}')">
+                  <img src="${s[2]}" alt="${s[1]}" onerror="this.src='https://via.placeholder.com/200x200?text=Image+Error'">
+                  <div class="card-body"><h6 class="card-title">${s[1]}</h6></div></div>`;
+        }).join('') : '<p class="text-center">ไม่มีร้านค้า</p>';
     }
 
     async function loadProductsByCategory(categoryId) {
       document.getElementById('selectionGrid').style.display = 'none';
       document.getElementById('productGrid').style.display = 'grid';
-      showSpinner();
-      try {
-        const productData = await fetchData('getProducts');
-        document.getElementById('productGrid').innerHTML = productData.length > 0 ? 
-          productData.slice(1).filter(p => p[2] === categoryId).map(p => {
-            return `<div class="product-card">
-                   <img src="${p[5]}" alt="${p[3]}" onerror="this.src='https://via.placeholder.com/180x180?text=Image+Error'">
-                   <div class="card-body">
-                   <h5 class="card-title">${p[3]}</h5>
-                   <p class="card-text">${p[4]} บาท</p>
-                   <p class="stock-info">สต็อก: ${p[6]} ชิ้น</p>
-                   <div class="input-group">
-                   <input type="number" min="1" max="${p[6]}" id="qty_${p[0]}" value="1" class="form-control">
-                   <button class="btn btn-success" onclick="addToCart({id:'${p[0]}',storeId:'${p[1]}',name:'${p[3]}',price:${p[4]},stock:${p[6]}}, document.getElementById('qty_${p[0]}').value)">เพิ่ม</button>
-                   </div></div></div>`;
-          }).join('') : '<p class="text-center">ไม่มีสินค้าในกลุ่มนี้</p>';
-      } catch (err) {
-        Swal.fire('ข้อผิดพลาด', err.message || 'ไม่สามารถโหลดสินค้าได้', 'error');
-      } finally {
-        hideSpinner();
-      }
+      const productData = await fetchSheetData('Products');
+      document.getElementById('productGrid').innerHTML = productData.length > 1 ? 
+        productData.slice(1).filter(p => p[2] === categoryId).map(p => {
+          return `<div class="product-card">
+                  <img src="${p[5]}" alt="${p[3]}" onerror="this.src='https://via.placeholder.com/180x180?text=Image+Error'">
+                  <div class="card-body">
+                  <h5 class="card-title">${p[3]}</h5>
+                  <p class="card-text">${p[4]} บาท</p>
+                  <p class="stock-info">สต็อก: ${p[6]} ชิ้น</p>
+                  <div class="input-group">
+                  <input type="number" min="1" max="${p[6]}" id="qty_${p[0]}" value="1" class="form-control">
+                  <button class="btn btn-success" onclick="addToCart({id:'${p[0]}',storeId:'${p[1]}',name:'${p[3]}',price:${p[4]},stock:${p[6]}}, document.getElementById('qty_${p[0]}').value)">เพิ่ม</button>
+                  </div></div></div>`;
+        }).join('') : '<p class="text-center">ไม่มีสินค้าในกลุ่มนี้</p>';
     }
 
     async function loadProductsByStore(storeId) {
       document.getElementById('selectionGrid').style.display = 'none';
       document.getElementById('productGrid').style.display = 'grid';
-      showSpinner();
-      try {
-        const productData = await fetchData('getProducts');
-        document.getElementById('productGrid').innerHTML = productData.length > 0 ? 
-          productData.slice(1).filter(p => p[1] === storeId).map(p => {
-            return `<div class="product-card">
-                   <img src="${p[5]}" alt="${p[3]}" onerror="this.src='https://via.placeholder.com/180x180?text=Image+Error'">
-                   <div class="card-body">
-                   <h5 class="card-title">${p[3]}</h5>
-                   <p class="card-text">${p[4]} บาท</p>
-                   <p class="stock-info">สต็อก: ${p[6]} ชิ้น</p>
-                   <div class="input-group">
-                   <input type="number" min="1" max="${p[6]}" id="qty_${p[0]}" value="1" class="form-control">
-                   <button class="btn btn-success" onclick="addToCart({id:'${p[0]}',storeId:'${p[1]}',name:'${p[3]}',price:${p[4]},stock:${p[6]}}, document.getElementById('qty_${p[0]}').value)">เพิ่ม</button>
-                   </div></div></div>`;
-          }).join('') : '<p class="text-center">ไม่มีสินค้าในร้านนี้</p>';
-      } catch (err) {
-        Swal.fire('ข้อผิดพลาด', err.message || 'ไม่สามารถโหลดสินค้าได้', 'error');
-      } finally {
-        hideSpinner();
-      }
+      const productData = await fetchSheetData('Products');
+      document.getElementById('productGrid').innerHTML = productData.length > 1 ? 
+        productData.slice(1).filter(p => p[1] === storeId).map(p => {
+          return `<div class="product-card">
+                  <img src="${p[5]}" alt="${p[3]}" onerror="this.src='https://via.placeholder.com/180x180?text=Image+Error'">
+                  <div class="card-body">
+                  <h5 class="card-title">${p[3]}</h5>
+                  <p class="card-text">${p[4]} บาท</p>
+                  <p class="stock-info">สต็อก: ${p[6]} ชิ้น</p>
+                  <div class="input-group">
+                  <input type="number" min="1" max="${p[6]}" id="qty_${p[0]}" value="1" class="form-control">
+                  <button class="btn btn-success" onclick="addToCart({id:'${p[0]}',storeId:'${p[1]}',name:'${p[3]}',price:${p[4]},stock:${p[6]}}, document.getElementById('qty_${p[0]}').value)">เพิ่ม</button>
+                  </div></div></div>`;
+        }).join('') : '<p class="text-center">ไม่มีสินค้าในร้านนี้</p>';
     }
 
-    // ฟังก์ชันเกี่ยวกับตะกร้าสินค้า
     function addToCart(item, qty) {
       qty = parseInt(qty);
       if (qty < 1 || qty > item.stock) {
@@ -495,7 +403,7 @@ async function loadInitialData() {
         return;
       }
 
-      var existingItem = cart.find(i => i.id === item.id);
+      const existingItem = cart.find(i => i.id === item.id);
       if (existingItem) {
         existingItem.qty += qty;
         if (existingItem.qty > item.stock) {
@@ -510,15 +418,15 @@ async function loadInitialData() {
     }
 
     function updateCart() {
-      var cartDiv = document.getElementById('cartItems');
+      const cartDiv = document.getElementById('cartItems');
       cartDiv.innerHTML = cart.length > 0 ? cart.map((item, idx) => {
-        return '<div class="d-flex justify-content-between align-items-center mb-2">' +
-               '<span>' + item.name + ' - ' + item.price + ' x ' + item.qty + '</span>' +
-               '<button class="btn btn-sm btn-danger" onclick="removeFromCart(' + idx + ')">🗑️</button>' +
-               '</div>';
+        return `<div class="d-flex justify-content-between align-items-center mb-2">
+                <span>${item.name} - ${item.price} x ${item.qty}</span>
+                <button class="btn btn-sm btn-danger" onclick="removeFromCart(${idx})">🗑️</button>
+                </div>`;
       }).join('') : '<p class="text-center">ตะกร้าว่าง</p>';
-      var total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-      document.getElementById('totalPrice').innerText = 'รวม: ' + total + ' บาท';
+      const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+      document.getElementById('totalPrice').innerText = `รวม: ${total} บาท`;
       document.getElementById('cartCount').innerText = `ตะกร้า (${cart.length})`;
     }
 
@@ -537,35 +445,47 @@ async function loadInitialData() {
         Swal.fire('ข้อผิดพลาด', 'ตะกร้าว่าง กรุณาเพิ่มสินค้าก่อนสั่งซื้อ', 'error');
         return;
       }
+      if (!userLineId) {
+        Swal.fire('ข้อผิดพลาด', 'กรุณาล็อกอินด้วย LINE ก่อนสั่งซื้อ', 'error');
+        liff.login();
+        return;
+      }
       cartModal.hide();
       orderModal.show();
     }
 
-    // ฟังก์ชันสั่งซื้อ
     async function submitOrder() {
-      var orderData = {
+      const orderData = {
         customerName: document.getElementById('customerName').value.trim(),
         phone: document.getElementById('phone').value.trim(),
-        lineId: document.getElementById('lineId').value.trim(),
+        lineId: userLineId,
         location: document.getElementById('location').value.trim(),
         items: cart
       };
-      
-      // ตรวจสอบข้อมูล
-      if (!orderData.customerName || !orderData.phone || !orderData.lineId || !orderData.location) {
-        Swal.fire('ข้อผิดพลาด', 'กรุณากรอกข้อมูลให้ครบ', 'error');
+
+      if (!orderData.customerName || !orderData.phone || !orderData.location) {
+        Swal.fire('ข้อผิดพลาด', 'กรุณากรอกข้อมูลให้ครบ (ชื่อ, เบอร์โทร, พิกัด)', 'error');
         return;
       }
-      
+
+      if (!/^\d{10}$/.test(orderData.phone)) {
+        Swal.fire('ข้อผิดพลาด', 'เบอร์โทรต้องเป็นตัวเลข 10 หลัก', 'error');
+        return;
+      }
+
       showSpinner();
       try {
-        const orderId = await fetchData('saveOrder', {orderData});
-        Swal.fire('สำเร็จ', 'คำสั่งซื้อ #' + orderId + ' ส่งแล้ว!', 'success');
+        const response = await fetch(appsScriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'saveOrder', data: orderData })
+        });
+        const result = await response.json();
+        if (result.error) throw new Error(result.error);
+        Swal.fire('สำเร็จ', `คำสั่งซื้อ #${result.orderId} ส่งแล้ว!`, 'success');
         resetCart();
-        // ล้างฟอร์ม
         document.getElementById('customerName').value = '';
         document.getElementById('phone').value = '';
-        document.getElementById('lineId').value = '';
         document.getElementById('location').value = '';
         orderModal.hide();
       } catch (err) {
@@ -575,9 +495,9 @@ async function loadInitialData() {
       }
     }
 
-    // เริ่มต้นแอปพลิเคชัน
-    window.onload = function() {
-      loadInitialData();
+    window.onload = async function() {
+      await initializeLiff();
+      await loadInitialData();
       getCustomerLocation();
     };
   </script>
