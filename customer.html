@@ -243,23 +243,36 @@
     let userLineId = '';
     const cartModal = new bootstrap.Modal(document.getElementById('cartModal'));
     const orderModal = new bootstrap.Modal(document.getElementById('orderModal'));
-    // แทนที่ด้วย URL จริงของ Web App หลัง deploy
-    const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbzI1HqB-4V9Icm5P1va-klymrLSwxSgeNYeehhNWrQxLJVg0KeX5AGN-LtWStLjsYju/exec'; // เช่น https://script.google.com/macros/s/.../exec
+    // Replace with your actual Google Apps Script Web App URL
+    const appsScriptUrl = 'YOUR_APPS_SCRIPT_URL_HERE'; // e.g., https://script.google.com/macros/s/.../exec
+
+    // Validate appsScriptUrl
+    if (appsScriptUrl === 'https://script.google.com/macros/s/AKfycbwzqi9IqsjlLF7spwrc8uUPaXCYtpBNMj6cCIsPehph3oGQFLz-yE7MNX96Gs-ghDX1/exec') {
+      Swal.fire('ข้อผิดพลาด', 'กรุณาใส่ URL ของ Google Apps Script Web App ในตัวแปร appsScriptUrl', 'error');
+      throw new Error('Invalid appsScriptUrl');
+    }
 
     function showSpinner() { document.getElementById('spinner').style.display = 'block'; }
     function hideSpinner() { document.getElementById('spinner').style.display = 'none'; }
 
-    // ฟังก์ชัน retry สำหรับการส่งคำขอ
+    // Fetch with retry and improved error handling
     async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
       for (let i = 0; i < retries; i++) {
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 15000); // Timeout 15 วินาที
+          const timeoutId = setTimeout(() => controller.abort(), 15000); // 15-second timeout
           const response = await fetch(url, { ...options, signal: controller.signal });
           clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+
           return response;
         } catch (err) {
-          if (i === retries - 1) throw err;
+          if (i === retries - 1) {
+            throw new Error(`Failed after ${retries} attempts: ${err.message}`);
+          }
           console.warn(`Fetch attempt ${i + 1} failed: ${err.message}. Retrying...`);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
@@ -313,14 +326,14 @@
           method: 'GET',
           headers: { 'Content-Type': 'application/json' }
         });
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
         const data = await response.json();
-        if (data.error) throw new Error(data.error);
+        if (data.error) {
+          throw new Error(data.error);
+        }
         return data;
       } catch (err) {
-        Swal.fire('ข้อผิดพลาด', err.message || 'ไม่สามารถโหลดข้อมูลได้', 'error');
+        Swal.fire('ข้อผิดพลาด', `ไม่สามารถโหลดข้อมูลจาก "${sheetName}": ${err.message}`, 'error');
+        console.error(`FetchSheetData Error for ${sheetName}:`, err);
         return [];
       } finally {
         hideSpinner();
@@ -328,19 +341,24 @@
     }
 
     async function loadInitialData() {
-      const promoData = await fetchSheetData('Promotions');
-      document.getElementById('promoContent').innerHTML = promoData.length > 1 ? 
-        promoData.slice(1).map((p, idx) => {
-          const title = p[1] || 'ไม่มีชื่อ';
-          const desc = p[2] || 'ไม่มีรายละเอียด';
-          const img = p[3] || 'https://via.placeholder.com/300x150?text=ไม่มีรูปภาพ';
-          return `<div class="carousel-item ${idx === 0 ? 'active' : ''}">
-                  <img src="${img}" class="d-block w-100" alt="${title}">
-                  <div class="carousel-caption d-none d-md-block">
-                  <h5>${title}</h5>
-                  <p>${desc}</p>
-                  </div></div>`;
-        }).join('') : '<div class="carousel-item active"><p class="text-center py-5">ไม่มีโปรโมชั่น</p></div>';
+      try {
+        const promoData = await fetchSheetData('Promotions');
+        document.getElementById('promoContent').innerHTML = promoData.length > 1 ? 
+          promoData.slice(1).map((p, idx) => {
+            const title = p[1] || 'ไม่มีชื่อ';
+            const desc = p[2] || 'ไม่มีรายละเอียด';
+            const img = p[3] || 'https://via.placeholder.com/300x150?text=ไม่มีรูปภาพ';
+            return `<div class="carousel-item ${idx === 0 ? 'active' : ''}">
+                    <img src="${img}" class="d-block w-100" alt="${title}">
+                    <div class="carousel-caption d-none d-md-block">
+                    <h5>${title}</h5>
+                    <p>${desc}</p>
+                    </div></div>`;
+          }).join('') : '<div class="carousel-item active"><p class="text-center py-5">ไม่มีโปรโมชั่น</p></div>';
+      } catch (err) {
+        console.error('LoadInitialData Error:', err);
+        document.getElementById('promoContent').innerHTML = '<div class="carousel-item active"><p class="text-center py-5">ไม่สามารถโหลดโปรโมชั่นได้</p></div>';
+      }
     }
 
     async function showCategories() {
@@ -504,22 +522,6 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'saveOrder', data: orderData })
         });
-
-        if (!response.ok) {
-          console.warn(`HTTP error! Status: ${response.status}`);
-          Swal.fire({
-            icon: 'warning',
-            title: 'คำเตือน',
-            html: `การสั่งซื้ออาจสำเร็จ แต่ไม่สามารถยืนยันได้<br>กรุณาตรวจสอบใน Google Sheet หรือ LINE<br>รหัสสถานะ: ${response.status}`,
-            confirmButtonText: 'ตกลง'
-          });
-          resetCart();
-          document.getElementById('customerName').value = '';
-          document.getElementById('phone').value = '';
-          document.getElementById('location').value = '';
-          orderModal.hide();
-          return;
-        }
 
         let result;
         try {
