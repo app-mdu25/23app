@@ -267,6 +267,7 @@
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         const text = await response.text();
         if (!text.includes('Deployment is working')) throw new Error('Web App ไม่ทำงานตามที่คาดไว้');
+        console.log('Apps Script Web App is accessible');
       } catch (err) {
         Swal.fire({
           icon: 'error',
@@ -378,12 +379,17 @@
           headers: { 'Content-Type': 'application/json' }
         });
         const data = await response.json();
+        console.log(`Fetched data for sheet "${sheetName}":`, data);
         if (data.error) {
           throw new Error(data.error);
         }
         if (!Array.isArray(data) || data.length <= 1) {
           console.warn(`Sheet "${sheetName}" is empty or contains only headers`);
           return [];
+        }
+        if (sheetName === 'Promotions' && data[0][0] !== 'PromoID') {
+          console.warn(`Sheet "${sheetName}" has unexpected header:`, data[0]);
+          throw new Error(`โครงสร้างชีต "${sheetName}" ไม่ถูกต้อง คาดหวังส่วนหัว "PromoID"`);
         }
         return data;
       } catch (err) {
@@ -395,6 +401,8 @@
           errorMessage = `ไม่สามารถเชื่อมต่อกับ Google Apps Script: ${err.message}. กรุณาตรวจสอบ URL หรือการเชื่อมต่อ`;
         } else if (err.message.includes('Invalid response')) {
           errorMessage = `การตอบกลับจากเซิร์ฟเวอร์ไม่ถูกต้อง กรุณาตรวจสอบ Google Apps Script`;
+        } else if (err.message.includes('โครงสร้างชีต')) {
+          errorMessage = err.message;
         }
         Swal.fire({
           icon: 'error',
@@ -415,7 +423,12 @@
           promoData.slice(1).map((p, idx) => {
             const title = p[1] || 'ไม่มีชื่อ';
             const desc = p[2] || 'ไม่มีรายละเอียด';
-            const img = p[3] || 'https://via.placeholder.com/300x150?text=ไม่มีรูปภาพ';
+            let img = p[3] || 'https://via.placeholder.com/300x150?text=ไม่มีรูปภาพ';
+            // Validate image URL
+            if (!img.startsWith('http://') && !img.startsWith('https://')) {
+              console.warn(`Invalid image URL for promotion "${title}": ${img}`);
+              img = 'https://via.placeholder.com/300x150?text=Invalid+Image+URL';
+            }
             return `<div class="carousel-item ${idx === 0 ? 'active' : ''}">
                     <img src="${img}" class="d-block w-100" alt="${title}" onerror="this.src='https://via.placeholder.com/300x150?text=Image+Error'; this.onerror=null;">
                     <div class="carousel-caption d-none d-md-block">
