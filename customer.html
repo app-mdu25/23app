@@ -247,7 +247,7 @@
     const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbwqPfwUXmYqFE6UGTV8N9sKT4nJn8C34AEszgKg5pyMmTQNfuv4d7O3UielJW2eUScw/exec';
 
     // Validate appsScriptUrl
-    if (!appsScriptUrl || typeof appsScriptUrl !== 'string' || appsScriptUrl.trim() === '' || appsScriptUrl.includes('YOUR_') || !appsScriptUrl.startsWith('https://script.google.com/macros/s/')) {
+    if (!appsScriptUrl || typeof appsScriptUrl !== 'string' || appsScriptUrl.trim() === '' || appsScriptUrl.includes('https://script.google.com/macros/s/AKfycbwqPfwUXmYqFE6UGTV8N9sKT4nJn8C34AEszgKg5pyMmTQNfuv4d7O3UielJW2eUScw/exec') || !appsScriptUrl.startsWith('https://script.google.com/macros/s/AKfycbwqPfwUXmYqFE6UGTV8N9sKT4nJn8C34AEszgKg5pyMmTQNfuv4d7O3UielJW2eUScw/exec')) {
       Swal.fire({
         icon: 'error',
         title: 'ข้อผิดพลาด',
