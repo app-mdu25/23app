@@ -176,15 +176,16 @@
     <h3 class="section-title">เลือกวิธีการเลือกซื้อ</h3>
     <div id="initialSelection" class="initial-selection mb-5">
       <div class="selection-card" onclick="showCategories()">
-        <img src="https://img5.pic.in.th/file/secure-sv1/select-product.png" alt="กลุ่มสินค้า">
+        <img src="https://img5.pic.in.th/file/secure-sv1/select-product.png" alt="กลุ่มสินค้า" onerror="this.src='https://via.placeholder.com/200x200?text=Image+Error'; this.onerror=null;">
         <div class="card-body text-center fw-bold">เลือกตามกลุ่มสินค้า</div>
       </div>
       <div class="selection-card" onclick="showStores()">
-        <img src="https://img2.pic.in.th/pic/select-store.png" alt="ร้านค้า">
+        <img src="https://img2.pic.in.th/pic/select-store.png" alt="ร้านค้า" onerror="this.src='https://via.placeholder.com/200x200?text=Image+Error'; this.onerror=null;">
         <div class="card-body text-center fw-bold">เลือกตามร้านค้า</div>
       </div>
     </div>
 
+    <button class="btn btn-secondary mb-3" onclick="backToInitial()" style="display: none;" id="backButton">กลับไปหน้าเลือกซื้อ</button>
     <div id="selectionGrid" class="selection-grid" style="display: none;"></div>
     <div id="productGrid" class="product-grid" style="display: none;"></div>
 
@@ -243,11 +244,10 @@
     let userLineId = '';
     const cartModal = new bootstrap.Modal(document.getElementById('cartModal'));
     const orderModal = new bootstrap.Modal(document.getElementById('orderModal'));
-    // Google Apps Script Web App URL
     const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbwqPfwUXmYqFE6UGTV8N9sKT4nJn8C34AEszgKg5pyMmTQNfuv4d7O3UielJW2eUScw/exec';
 
     // Validate appsScriptUrl
-    if (!appsScriptUrl || typeof appsScriptUrl !== 'string' || appsScriptUrl.trim() === '' || appsScriptUrl.includes('https://script.google.com/macros/s/AKfycbwqPfwUXmYqFE6UGTV8N9sKT4nJn8C34AEszgKg5pyMmTQNfuv4d7O3UielJW2eUScw/exec') || !appsScriptUrl.startsWith('https://script.google.com/macros/s/AKfycbwqPfwUXmYqFE6UGTV8N9sKT4nJn8C34AEszgKg5pyMmTQNfuv4d7O3UielJW2eUScw/exec')) {
+    if (!appsScriptUrl || typeof appsScriptUrl !== 'string' || appsScriptUrl.trim() === '') {
       Swal.fire({
         icon: 'error',
         title: 'ข้อผิดพลาด',
@@ -259,12 +259,30 @@
     function showSpinner() { document.getElementById('spinner').style.display = 'block'; }
     function hideSpinner() { document.getElementById('spinner').style.display = 'none'; }
 
+    // Test Apps Script URL
+    async function testAppsScriptUrl() {
+      try {
+        const response = await fetch(`${appsScriptUrl}?action=testDeployment`, { method: 'GET' });
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        const text = await response.text();
+        if (!text.includes('Deployment is working')) throw new Error('Web App ไม่ทำงานตามที่คาดไว้');
+      } catch (err) {
+        Swal.fire({
+          icon: 'error',
+          title: 'ข้อผิดพลาด',
+          text: `ไม่สามารถเชื่อมต่อกับ Google Apps Script: ${err.message}`,
+          footer: 'กรุณาตรวจสอบ URL หรือการตั้งค่า Web App'
+        });
+        console.error('TestAppsScriptUrl Error:', err);
+      }
+    }
+
     // Fetch with retry and improved error handling
     async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
       for (let i = 0; i < retries; i++) {
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 15000); // 15-second timeout
+          const timeoutId = setTimeout(() => controller.abort(), 15000);
           const response = await fetch(url, { ...options, signal: controller.signal });
           clearTimeout(timeoutId);
 
@@ -272,14 +290,22 @@
             throw new Error(`HTTP error! Status: ${response.status}`);
           }
 
+          const contentType = response.headers.get('Content-Type');
+          if (!contentType || !contentType.includes('application/json')) {
+            throw new Error('Invalid response: Expected JSON');
+          }
+
           return response;
         } catch (err) {
           if (i === retries - 1) {
+            console.log(`Failed fetch to ${url} with options:`, options);
             let errorMessage = err.message;
-            if (err.message.includes('404')) {
-              errorMessage = 'ไม่พบทรัพยากรที่ร้องขอ กรุณาตรวจสอบ URL หรือชีต Promotions';
+            if (err.message.includes('Failed to fetch')) {
+              errorMessage = 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ กรุณาตรวจสอบการเชื่อมต่อหรือ URL';
+            } else if (err.message.includes('aborted')) {
+              errorMessage = 'คำขอหมดเวลา กรุณาลองใหม่';
             }
-            throw new Error(`ล้มเหลวหลังจากพยายาม ${retries} ครั้ง: ${errorMessage}`);
+            throw new Error(`ล้มเหลวหลังจากพยายาม ${retries} ครั้งสำหรับ URL ${url}: ${errorMessage}`);
           }
           console.warn(`Fetch attempt ${i + 1} failed: ${err.message}. Retrying...`);
           await new Promise(resolve => setTimeout(resolve, delay));
@@ -301,7 +327,8 @@
           document.getElementById('lineId').value = userLineId;
         }
       } catch (e) {
-        Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเริ่มต้น LI-shape ได้: ' + e.message, 'error');
+        Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเริ่มต้น LIFF ได้: ' + e.message, 'error');
+        console.error('InitializeLiff Error:', e);
       }
     }
 
@@ -338,10 +365,13 @@
         if (data.error) {
           throw new Error(data.error);
         }
+        if (data.length <= 1) {
+          return [];
+        }
         return data;
       } catch (err) {
         let errorMessage = err.message;
-        if (err.message.includes('404') || err.message.includes('ไม่พบทรัพยากร')) {
+        if (err.message.includes('HTTP error') || err.message.includes('ไม่สามารถเชื่อมต่อ')) {
           errorMessage = `ไม่สามารถโหลดข้อมูลจาก "${sheetName}": กรุณาตรวจสอบว่า URL ของ Google Apps Script ถูกต้องและชีต "${sheetName}" มีอยู่ใน Google Sheet`;
         }
         Swal.fire('ข้อผิดพลาด', errorMessage, 'error');
@@ -361,7 +391,7 @@
             const desc = p[2] || 'ไม่มีรายละเอียด';
             const img = p[3] || 'https://via.placeholder.com/300x150?text=ไม่มีรูปภาพ';
             return `<div class="carousel-item ${idx === 0 ? 'active' : ''}">
-                    <img src="${img}" class="d-block w-100" alt="${title}">
+                    <img src="${img}" class="d-block w-100" alt="${title}" onerror="this.src='https://via.placeholder.com/300x150?text=Image+Error'; this.onerror=null;">
                     <div class="carousel-caption d-none d-md-block">
                     <h5>${title}</h5>
                     <p>${desc}</p>
@@ -377,16 +407,21 @@
       document.getElementById('initialSelection').style.display = 'none';
       document.getElementById('selectionGrid').style.display = 'grid';
       document.getElementById('productGrid').style.display = 'none';
+      document.getElementById('backButton').style.display = 'block';
       const categoryData = await fetchSheetData('Categories');
       document.getElementById('selectionGrid').innerHTML = categoryData.length > 1 ? 
         categoryData.slice(1).map(c => {
           let imageUrl = c[2] && c[2].trim() !== '' ? c[2] : 'https://via.placeholder.com/200x200?text=No+Image';
           if (imageUrl.includes('drive.google.com/file/d/')) {
-            const fileIdMatch = imageUrl.match(/file\/d\/(.+?)\//);
-            if (fileIdMatch && fileIdMatch[1]) imageUrl = 'https://drive.google.com/uc?export=view&id=' + fileIdMatch[1];
+            const fileIdMatch = imageUrl.match(/file\/d\/(.+?)(?:\/|$)/);
+            if (fileIdMatch && fileIdMatch[1]) {
+              imageUrl = 'https://drive.google.com/uc?export=view&id=' + fileIdMatch[1];
+            } else {
+              imageUrl = 'https://via.placeholder.com/200x200?text=Invalid+Drive+URL';
+            }
           }
           return `<div class="selection-card" onclick="loadProductsByCategory('${c[0]}')">
-                  <img src="${imageUrl}" alt="${c[1]}" onerror="this.src='https://via.placeholder.com/200x200?text=Image+Error'">
+                  <img src="${imageUrl}" alt="${c[1]}" onerror="this.src='https://via.placeholder.com/200x200?text=Image+Error'; this.onerror=null;">
                   <div class="card-body"><h6 class="card-title">${c[1]}</h6></div></div>`;
         }).join('') : '<p class="text-center">ไม่มีกลุ่มสินค้า</p>';
     }
@@ -395,11 +430,12 @@
       document.getElementById('initialSelection').style.display = 'none';
       document.getElementById('selectionGrid').style.display = 'grid';
       document.getElementById('productGrid').style.display = 'none';
+      document.getElementById('backButton').style.display = 'block';
       const storeData = await fetchSheetData('Stores');
       document.getElementById('selectionGrid').innerHTML = storeData.length > 1 ? 
         storeData.slice(1).map(s => {
           return `<div class="selection-card" onclick="loadProductsByStore('${s[0]}')">
-                  <img src="${s[2]}" alt="${s[1]}" onerror="this.src='https://via.placeholder.com/200x200?text=Image+Error'">
+                  <img src="${s[2]}" alt="${s[1]}" onerror="this.src='https://via.placeholder.com/200x200?text=Image+Error'; this.onerror=null;">
                   <div class="card-body"><h6 class="card-title">${s[1]}</h6></div></div>`;
         }).join('') : '<p class="text-center">ไม่มีร้านค้า</p>';
     }
@@ -407,11 +443,12 @@
     async function loadProductsByCategory(categoryId) {
       document.getElementById('selectionGrid').style.display = 'none';
       document.getElementById('productGrid').style.display = 'grid';
+      document.getElementById('backButton').style.display = 'block';
       const productData = await fetchSheetData('Products');
       document.getElementById('productGrid').innerHTML = productData.length > 1 ? 
         productData.slice(1).filter(p => p[2] === categoryId).map(p => {
           return `<div class="product-card">
-                  <img src="${p[5]}" alt="${p[3]}" onerror="this.src='https://via.placeholder.com/180x180?text=Image+Error'">
+                  <img src="${p[5]}" alt="${p[3]}" onerror="this.src='https://via.placeholder.com/180x180?text=Image+Error'; this.onerror=null;">
                   <div class="card-body">
                   <h5 class="card-title">${p[3]}</h5>
                   <p class="card-text">${p[4]} บาท</p>
@@ -426,11 +463,12 @@
     async function loadProductsByStore(storeId) {
       document.getElementById('selectionGrid').style.display = 'none';
       document.getElementById('productGrid').style.display = 'grid';
+      document.getElementById('backButton').style.display = 'block';
       const productData = await fetchSheetData('Products');
       document.getElementById('productGrid').innerHTML = productData.length > 1 ? 
         productData.slice(1).filter(p => p[1] === storeId).map(p => {
           return `<div class="product-card">
-                  <img src="${p[5]}" alt="${p[3]}" onerror="this.src='https://via.placeholder.com/180x180?text=Image+Error'">
+                  <img src="${p[5]}" alt="${p[3]}" onerror="this.src='https://via.placeholder.com/180x180?text=Image+Error'; this.onerror=null;">
                   <div class="card-body">
                   <h5 class="card-title">${p[3]}</h5>
                   <p class="card-text">${p[4]} บาท</p>
@@ -442,6 +480,13 @@
         }).join('') : '<p class="text-center">ไม่มีสินค้าในร้านนี้</p>';
     }
 
+    function backToInitial() {
+      document.getElementById('initialSelection').style.display = 'grid';
+      document.getElementById('selectionGrid').style.display = 'none';
+      document.getElementById('productGrid').style.display = 'none';
+      document.getElementById('backButton').style.display = 'none';
+    }
+
     function addToCart(item, qty) {
       qty = parseInt(qty);
       if (qty < 1 || qty > item.stock) {
@@ -449,11 +494,21 @@
         return;
       }
       if (cart.length >= 10 && !cart.find(i => i.id === item.id)) {
-        Swal.fire('ข้อผิดพลาด', 'ตะกร้าเต็ม (สูงสุด 10 รายการ)', 'error');
+        Swal.fire({
+          icon: 'error',
+          title: 'ข้อผิดพลาด',
+          text: 'ตะกร้าเต็ม (สูงสุด 10 รายการ)',
+          footer: 'กรุณาลบสินค้าบางรายการหรือรีเซ็ตตะกร้า'
+        });
         return;
       }
       if (cart.length > 0 && cart[0].storeId !== item.storeId) {
-        Swal.fire('ข้อผิดพลาด', 'กรุณาสั่งซื้อจากร้านเดียวกันเท่านั้น', 'error');
+        Swal.fire({
+          icon: 'error',
+          title: 'ข้อผิดพลาด',
+          text: 'กรุณาสั่งซื้อจากร้านเดียวกันเท่านั้น',
+          footer: 'กรุณารีเซ็ตตะกร้าเพื่อสั่งซื้อจากร้านใหม่'
+        });
         return;
       }
 
@@ -500,7 +555,12 @@
         return;
       }
       if (!userLineId) {
-        Swal.fire('ข้อผิดพลาด', 'กรุณาล็อกอินด้วย LINE ก่อนสั่งซื้อ', 'error');
+        Swal.fire({
+          icon: 'error',
+          title: 'ข้อผิดพลาด',
+          text: 'กรุณาล็อกอินด้วย LINE ก่อนสั่งซื้อ',
+          footer: 'กำลังเปลี่ยนเส้นทางไปยังหน้าเข้าสู่ระบบ'
+        });
         liff.login();
         return;
       }
@@ -527,6 +587,11 @@
         return;
       }
 
+      if (!orderData.items.every(item => item.id && item.storeId && item.name && item.price >= 0 && item.qty > 0)) {
+        Swal.fire('ข้อผิดพลาด', 'ข้อมูลสินค้าในตะกร้าไม่ถูกต้อง', 'error');
+        return;
+      }
+
       showSpinner();
       try {
         const response = await fetchWithRetry(appsScriptUrl, {
@@ -542,8 +607,8 @@
           throw new Error('Invalid JSON response from server');
         }
 
-        if (result.error) {
-          throw new Error(result.error);
+        if (result.error || !result.success || !result.orderId) {
+          throw new Error(result.error || 'การสั่งซื้อไม่สำเร็จ: ไม่ได้รับ orderId');
         }
 
         Swal.fire({
@@ -563,7 +628,8 @@
           icon: 'warning',
           title: 'คำเตือน',
           html: `การสั่งซื้ออาจสำเร็จ แต่ไม่สามารถยืนยันได้<br>กรุณาตรวจสอบใน Google Sheet หรือ LINE<br>ข้อผิดพลาด: ${err.message || 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์'}`,
-          confirmButtonText: 'ตกลง'
+          confirmButtonText: 'ตกลง',
+          footer: 'หากปัญหายังคงอยู่ ติดต่อผู้ดูแลระบบ'
         });
         resetCart();
         document.getElementById('customerName').value = '';
@@ -576,6 +642,7 @@
     }
 
     window.onload = async function() {
+      await testAppsScriptUrl();
       await initializeLiff();
       await loadInitialData();
       getCustomerLocation();
