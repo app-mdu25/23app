@@ -243,12 +243,16 @@
     let userLineId = '';
     const cartModal = new bootstrap.Modal(document.getElementById('cartModal'));
     const orderModal = new bootstrap.Modal(document.getElementById('orderModal'));
-    // Use the new Google Apps Script Web App URL
+    // Google Apps Script Web App URL
     const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbwqPfwUXmYqFE6UGTV8N9sKT4nJn8C34AEszgKg5pyMmTQNfuv4d7O3UielJW2eUScw/exec';
 
     // Validate appsScriptUrl
-    if (!appsScriptUrl || appsScriptUrl.includes('https://script.google.com/macros/s/AKfycbwqPfwUXmYqFE6UGTV8N9sKT4nJn8C34AEszgKg5pyMmTQNfuv4d7O3UielJW2eUScw/exec')) {
-      Swal.fire('ข้อผิดพลาด', 'กรุณาใส่ URL จริงของ Google Apps Script Web App ในตัวแปร appsScriptUrl', 'error');
+    if (!appsScriptUrl || typeof appsScriptUrl !== 'string' || appsScriptUrl.trim() === '' || appsScriptUrl.includes('YOUR_') || !appsScriptUrl.startsWith('https://script.google.com/macros/s/')) {
+      Swal.fire({
+        icon: 'error',
+        title: 'ข้อผิดพลาด',
+        text: 'URL ของ Google Apps Script Web App ไม่ถูกต้อง กรุณาตรวจสอบตัวแปร appsScriptUrl ในโค้ด'
+      });
       throw new Error('Invalid appsScriptUrl');
     }
 
@@ -297,7 +301,7 @@
           document.getElementById('lineId').value = userLineId;
         }
       } catch (e) {
-        Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเริ่มต้น LIFF ได้: ' + e.message, 'error');
+        Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเริ่มต้น LI-shape ได้: ' + e.message, 'error');
       }
     }
 
