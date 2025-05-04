@@ -244,10 +244,10 @@
     const cartModal = new bootstrap.Modal(document.getElementById('cartModal'));
     const orderModal = new bootstrap.Modal(document.getElementById('orderModal'));
     // Replace with your actual Google Apps Script Web App URL
-    const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbwzqi9IqsjlLF7spwrc8uUPaXCYtpBNMj6cCIsPehph3oGQFLz-yE7MNX96Gs-ghDX1/exec'; // e.g., https://script.google.com/macros/s/.../exec
+    const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbyl-6GYBusKgWF0akTdQAKoi3ZonOjJ78cycIUkfnP2AhRIlBOSOYxVxVtNYIM266qB/exec'; // e.g., https://script.google.com/macros/s/.../exec
 
     // Validate appsScriptUrl
-    if (appsScriptUrl === 'https://script.google.com/macros/s/AKfycbwzqi9IqsjlLF7spwrc8uUPaXCYtpBNMj6cCIsPehph3oGQFLz-yE7MNX96Gs-ghDX1/exec') {
+    if (appsScriptUrl === 'https://script.google.com/macros/s/AKfycbyl-6GYBusKgWF0akTdQAKoi3ZonOjJ78cycIUkfnP2AhRIlBOSOYxVxVtNYIM266qB/exec') {
       Swal.fire('ข้อผิดพลาด', 'กรุณาใส่ URL ของ Google Apps Script Web App ในตัวแปร appsScriptUrl', 'error');
       throw new Error('Invalid appsScriptUrl');
     }
@@ -271,7 +271,11 @@
           return response;
         } catch (err) {
           if (i === retries - 1) {
-            throw new Error(`Failed after ${retries} attempts: ${err.message}`);
+            let errorMessage = err.message;
+            if (err.message.includes('404')) {
+              errorMessage = 'ไม่พบทรัพยากรที่ร้องขอ กรุณาตรวจสอบ URL หรือชีต Promotions';
+            }
+            throw new Error(`ล้มเหลวหลังจากพยายาม ${retries} ครั้ง: ${errorMessage}`);
           }
           console.warn(`Fetch attempt ${i + 1} failed: ${err.message}. Retrying...`);
           await new Promise(resolve => setTimeout(resolve, delay));
@@ -332,7 +336,11 @@
         }
         return data;
       } catch (err) {
-        Swal.fire('ข้อผิดพลาด', `ไม่สามารถโหลดข้อมูลจาก "${sheetName}": ${err.message}`, 'error');
+        let errorMessage = err.message;
+        if (err.message.includes('404') || err.message.includes('ไม่พบทรัพยากร')) {
+          errorMessage = `ไม่สามารถโหลดข้อมูลจาก "${sheetName}": กรุณาตรวจสอบว่า URL ของ Google Apps Script ถูกต้องและชีต "${sheetName}" มีอยู่ใน Google Sheet`;
+        }
+        Swal.fire('ข้อผิดพลาด', errorMessage, 'error');
         console.error(`FetchSheetData Error for ${sheetName}:`, err);
         return [];
       } finally {
@@ -357,7 +365,7 @@
           }).join('') : '<div class="carousel-item active"><p class="text-center py-5">ไม่มีโปรโมชั่น</p></div>';
       } catch (err) {
         console.error('LoadInitialData Error:', err);
-        document.getElementById('promoContent').innerHTML = '<div class="carousel-item active"><p class="text-center py-5">ไม่สามารถโหลดโปรโมชั่นได้</p></div>';
+        document.getElementById('promoContent').innerHTML = '<div class="carousel-item active"><p class="text-center py-5">ไม่สามารถโหลดโปรโมชั่นได้ กรุณาตรวจสอบ Google Sheet หรือการเชื่อมต่อ</p></div>';
       }
     }
 
