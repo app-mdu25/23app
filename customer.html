@@ -244,14 +244,14 @@
     let userLineId = '';
     const cartModal = new bootstrap.Modal(document.getElementById('cartModal'));
     const orderModal = new bootstrap.Modal(document.getElementById('orderModal'));
-    const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbwqPfwUXmYqFE6UGTV8N9sKT4nJn8C34AEszgKg5pyMmTQNfuv4d7O3UielJW2eUScw/exec';
+    const appsScriptUrl = window.location.href;
 
     // Validate appsScriptUrl
     if (!appsScriptUrl || typeof appsScriptUrl !== 'string' || appsScriptUrl.trim() === '') {
       Swal.fire({
         icon: 'error',
         title: 'ข้อผิดพลาด',
-        text: 'URL ของ Google Apps Script Web App ไม่ถูกต้อง กรุณาตรวจสอบตัวแปร appsScriptUrl ในโค้ด',
+        text: 'URL ของ Google Apps Script Web App ไม่ถูกต้อง',
         footer: 'ติดต่อผู้ดูแลระบบหากปัญหายังคงอยู่'
       });
       throw new Error('Invalid appsScriptUrl');
@@ -398,7 +398,7 @@
         if (err.message.includes('Sheet') && err.message.includes('not found')) {
           errorMessage = `ไม่พบชีต "${sheetName}" ใน Google Sheet กรุณาตรวจสอบชื่อชีตและการตั้งค่า`;
         } else if (err.message.includes('HTTP error') || err.message.includes('ไม่สามารถเชื่อมต่อ')) {
-          errorMessage = `ไม่สามารถเชื่อมต่อกับ Google Apps Script: ${err.message}. กรุณาตรวจสอบ URL หรือการเชื่อมต่อ`;
+          errorMessage = `ไม่สามารถเชื่อมต่อกับ Google Apps Script: ${err.message}. กรุณาตรวจสอบ URL หรือการตั้งค่า Web App`;
         } else if (err.message.includes('Invalid response')) {
           errorMessage = `การตอบกลับจากเซิร์ฟเวอร์ไม่ถูกต้อง กรุณาตรวจสอบ Google Apps Script`;
         } else if (err.message.includes('โครงสร้างชีต')) {
@@ -424,7 +424,6 @@
             const title = p[1] || 'ไม่มีชื่อ';
             const desc = p[2] || 'ไม่มีรายละเอียด';
             let img = p[3] || 'https://via.placeholder.com/300x150?text=ไม่มีรูปภาพ';
-            // Validate image URL
             if (!img.startsWith('http://') && !img.startsWith('https://')) {
               console.warn(`Invalid image URL for promotion "${title}": ${img}`);
               img = 'https://via.placeholder.com/300x150?text=Invalid+Image+URL';
