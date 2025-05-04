@@ -243,10 +243,28 @@
     let userLineId = '';
     const cartModal = new bootstrap.Modal(document.getElementById('cartModal'));
     const orderModal = new bootstrap.Modal(document.getElementById('orderModal'));
-    const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbwAtGBjn3rS1edGmYigIep_9cC3MqgGvGfMa1VmbRs-8A3rBnUzizodryKTZysTgPZR/exec'; // ใช้ URL เดิมของ Web App
+    // แทนที่ด้วย URL จริงของ Web App หลัง deploy
+    const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbzI1HqB-4V9Icm5P1va-klymrLSwxSgeNYeehhNWrQxLJVg0KeX5AGN-LtWStLjsYju/exec'; // เช่น https://script.google.com/macros/s/.../exec
 
     function showSpinner() { document.getElementById('spinner').style.display = 'block'; }
     function hideSpinner() { document.getElementById('spinner').style.display = 'none'; }
+
+    // ฟังก์ชัน retry สำหรับการส่งคำขอ
+    async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
+      for (let i = 0; i < retries; i++) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 15000); // Timeout 15 วินาที
+          const response = await fetch(url, { ...options, signal: controller.signal });
+          clearTimeout(timeoutId);
+          return response;
+        } catch (err) {
+          if (i === retries - 1) throw err;
+          console.warn(`Fetch attempt ${i + 1} failed: ${err.message}. Retrying...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
 
     // Initialize LIFF
     async function initializeLiff() {
@@ -291,7 +309,10 @@
     async function fetchSheetData(sheetName) {
       try {
         showSpinner();
-        const response = await fetch(`${appsScriptUrl}?action=getSheetData&sheetName=${sheetName}`);
+        const response = await fetchWithRetry(`${appsScriptUrl}?action=getSheetData&sheetName=${sheetName}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
@@ -478,18 +499,20 @@
 
       showSpinner();
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // Timeout 10 วินาที
-        const response = await fetch(appsScriptUrl, {
+        const response = await fetchWithRetry(appsScriptUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'saveOrder', data: orderData }),
-          signal: controller.signal
+          body: JSON.stringify({ action: 'saveOrder', data: orderData })
         });
-        clearTimeout(timeoutId);
+
         if (!response.ok) {
           console.warn(`HTTP error! Status: ${response.status}`);
-          Swal.fire('คำเตือน', 'การสั่งซื้ออาจสำเร็จ แต่ไม่สามารถยืนยันได้ กรุณาตรวจสอบใน Google Sheet หรือ LINE', 'warning');
+          Swal.fire({
+            icon: 'warning',
+            title: 'คำเตือน',
+            html: `การสั่งซื้ออาจสำเร็จ แต่ไม่สามารถยืนยันได้<br>กรุณาตรวจสอบใน Google Sheet หรือ LINE<br>รหัสสถานะ: ${response.status}`,
+            confirmButtonText: 'ตกลง'
+          });
           resetCart();
           document.getElementById('customerName').value = '';
           document.getElementById('phone').value = '';
@@ -497,17 +520,37 @@
           orderModal.hide();
           return;
         }
-        const result = await response.json();
-        if (result.error) throw new Error(result.error);
-        Swal.fire('สำเร็จ', `คำสั่งซื้อ #${result.orderId} ส่งแล้ว!`, 'success');
+
+        let result;
+        try {
+          result = await response.json();
+        } catch (e) {
+          throw new Error('Invalid JSON response from server');
+        }
+
+        if (result.error) {
+          throw new Error(result.error);
+        }
+
+        Swal.fire({
+          icon: 'success',
+          title: 'สำเร็จ',
+          text: `คำสั่งซื้อ #${result.orderId} ส่งแล้ว!`,
+          confirmButtonText: 'ตกลง'
+        });
         resetCart();
         document.getElementById('customerName').value = '';
         document.getElementById('phone').value = '';
         document.getElementById('location').value = '';
         orderModal.hide();
       } catch (err) {
-        console.error('Error:', err);
-        Swal.fire('คำเตือน', 'การสั่งซื้ออาจสำเร็จ กรุณาตรวจสอบใน Google Sheet หรือ LINE', 'warning');
+        console.error('SubmitOrder Error:', err);
+        Swal.fire({
+          icon: 'warning',
+          title: 'คำเตือน',
+          html: `การสั่งซื้ออาจสำเร็จ แต่ไม่สามารถยืนยันได้<br>กรุณาตรวจสอบใน Google Sheet หรือ LINE<br>ข้อผิดพลาด: ${err.message || 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์'}`,
+          confirmButtonText: 'ตกลง'
+        });
         resetCart();
         document.getElementById('customerName').value = '';
         document.getElementById('phone').value = '';
@@ -524,6 +567,5 @@
       getCustomerLocation();
     };
   </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93a44527498f7bc3',t:'MTc0NjMyMjYxNy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
