@@ -251,7 +251,8 @@
       Swal.fire({
         icon: 'error',
         title: 'ข้อผิดพลาด',
-        text: 'URL ของ Google Apps Script Web App ไม่ถูกต้อง กรุณาตรวจสอบตัวแปร appsScriptUrl ในโค้ด'
+        text: 'URL ของ Google Apps Script Web App ไม่ถูกต้อง กรุณาตรวจสอบตัวแปร appsScriptUrl ในโค้ด',
+        footer: 'ติดต่อผู้ดูแลระบบหากปัญหายังคงอยู่'
       });
       throw new Error('Invalid appsScriptUrl');
     }
@@ -298,10 +299,10 @@
           return response;
         } catch (err) {
           if (i === retries - 1) {
-            console.log(`Failed fetch to ${url} with options:`, options);
+            console.error(`Failed fetch to ${url} with options:`, options, 'Error:', err);
             let errorMessage = err.message;
             if (err.message.includes('Failed to fetch')) {
-              errorMessage = 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ กรุณาตรวจสอบการเชื่อมต่อหรือ URL';
+              errorMessage = 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตหรือ URL';
             } else if (err.message.includes('aborted')) {
               errorMessage = 'คำขอหมดเวลา กรุณาลองใหม่';
             }
@@ -327,7 +328,12 @@
           document.getElementById('lineId').value = userLineId;
         }
       } catch (e) {
-        Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเริ่มต้น LIFF ได้: ' + e.message, 'error');
+        Swal.fire({
+          icon: 'error',
+          title: 'ข้อผิดพลาด',
+          text: 'ไม่สามารถเริ่มต้น LIFF ได้: ' + e.message,
+          footer: 'กรุณาตรวจสอบ LIFF ID หรือการเชื่อมต่อ'
+        });
         console.error('InitializeLiff Error:', e);
       }
     }
@@ -342,14 +348,24 @@
             hideSpinner();
           },
           error => {
-            Swal.fire('ข้อผิดพลาด', 'ไม่สามารถดึงพิกัดได้ กรุณากรอกเอง', 'warning');
+            Swal.fire({
+              icon: 'warning',
+              title: 'ข้อผิดพลาด',
+              text: 'ไม่สามารถดึงพิกัดได้ กรุณากรอกเอง',
+              footer: 'ตรวจสอบการอนุญาตตำแหน่งในเบราว์เซอร์'
+            });
             document.getElementById('location').value = '';
             hideSpinner();
           },
           { timeout: 10000, enableHighAccuracy: true }
         );
       } else {
-        Swal.fire('ข้อผิดพลาด', 'เบราว์เซอร์ไม่รองรับ Geolocation', 'error');
+        Swal.fire({
+          icon: 'error',
+          title: 'ข้อผิดพลาด',
+          text: 'เบราว์เซอร์ไม่รองรับ Geolocation',
+          footer: 'กรุณากรอกพิกัดด้วยตนเอง'
+        });
         document.getElementById('location').value = '';
       }
     }
@@ -365,17 +381,27 @@
         if (data.error) {
           throw new Error(data.error);
         }
-        if (data.length <= 1) {
+        if (!Array.isArray(data) || data.length <= 1) {
+          console.warn(`Sheet "${sheetName}" is empty or contains only headers`);
           return [];
         }
         return data;
       } catch (err) {
-        let errorMessage = err.message;
-        if (err.message.includes('HTTP error') || err.message.includes('ไม่สามารถเชื่อมต่อ')) {
-          errorMessage = `ไม่สามารถโหลดข้อมูลจาก "${sheetName}": กรุณาตรวจสอบว่า URL ของ Google Apps Script ถูกต้องและชีต "${sheetName}" มีอยู่ใน Google Sheet`;
-        }
-        Swal.fire('ข้อผิดพลาด', errorMessage, 'error');
         console.error(`FetchSheetData Error for ${sheetName}:`, err);
+        let errorMessage = err.message;
+        if (err.message.includes('Sheet') && err.message.includes('not found')) {
+          errorMessage = `ไม่พบชีต "${sheetName}" ใน Google Sheet กรุณาตรวจสอบชื่อชีตและการตั้งค่า`;
+        } else if (err.message.includes('HTTP error') || err.message.includes('ไม่สามารถเชื่อมต่อ')) {
+          errorMessage = `ไม่สามารถเชื่อมต่อกับ Google Apps Script: ${err.message}. กรุณาตรวจสอบ URL หรือการเชื่อมต่อ`;
+        } else if (err.message.includes('Invalid response')) {
+          errorMessage = `การตอบกลับจากเซิร์ฟเวอร์ไม่ถูกต้อง กรุณาตรวจสอบ Google Apps Script`;
+        }
+        Swal.fire({
+          icon: 'error',
+          title: 'ข้อผิดพลาด',
+          text: errorMessage,
+          footer: `URL: ${appsScriptUrl}<br>ติดต่อผู้ดูแลระบบหากปัญหายังคงอยู่`
+        });
         return [];
       } finally {
         hideSpinner();
@@ -396,7 +422,7 @@
                     <h5>${title}</h5>
                     <p>${desc}</p>
                     </div></div>`;
-          }).join('') : '<div class="carousel-item active"><p class="text-center py-5">ไม่มีโปรโมชั่น</p></div>';
+          }).join('') : '<div class="carousel-item active"><p class="text-center py-5">ไม่มีโปรโมชั่นในขณะนี้</p></div>';
       } catch (err) {
         console.error('LoadInitialData Error:', err);
         document.getElementById('promoContent').innerHTML = '<div class="carousel-item active"><p class="text-center py-5">ไม่สามารถโหลดโปรโมชั่นได้ กรุณาตรวจสอบ Google Sheet หรือการเชื่อมต่อ</p></div>';
@@ -423,7 +449,7 @@
           return `<div class="selection-card" onclick="loadProductsByCategory('${c[0]}')">
                   <img src="${imageUrl}" alt="${c[1]}" onerror="this.src='https://via.placeholder.com/200x200?text=Image+Error'; this.onerror=null;">
                   <div class="card-body"><h6 class="card-title">${c[1]}</h6></div></div>`;
-        }).join('') : '<p class="text-center">ไม่มีกลุ่มสินค้า</p>';
+        }).join('') : '<p class="text-center">ไม่มีกลุ่มสินค้าในขณะนี้</p>';
     }
 
     async function showStores() {
@@ -437,7 +463,7 @@
           return `<div class="selection-card" onclick="loadProductsByStore('${s[0]}')">
                   <img src="${s[2]}" alt="${s[1]}" onerror="this.src='https://via.placeholder.com/200x200?text=Image+Error'; this.onerror=null;">
                   <div class="card-body"><h6 class="card-title">${s[1]}</h6></div></div>`;
-        }).join('') : '<p class="text-center">ไม่มีร้านค้า</p>';
+        }).join('') : '<p class="text-center">ไม่มีร้านค้าในขณะนี้</p>';
     }
 
     async function loadProductsByCategory(categoryId) {
@@ -490,7 +516,12 @@
     function addToCart(item, qty) {
       qty = parseInt(qty);
       if (qty < 1 || qty > item.stock) {
-        Swal.fire('ข้อผิดพลาด', `จำนวนต้องอยู่ระหว่าง 1-${item.stock}`, 'error');
+        Swal.fire({
+          icon: 'error',
+          title: 'ข้อผิดพลาด',
+          text: `จำนวนต้องอยู่ระหว่าง 1-${item.stock}`,
+          footer: 'กรุณาเลือกจำนวนที่ถูกต้อง'
+        });
         return;
       }
       if (cart.length >= 10 && !cart.find(i => i.id === item.id)) {
@@ -516,7 +547,12 @@
       if (existingItem) {
         existingItem.qty += qty;
         if (existingItem.qty > item.stock) {
-          Swal.fire('ข้อผิดพลาด', `จำนวนสินค้า "${item.name}" ต้องไม่เกิน ${item.stock}`, 'error');
+          Swal.fire({
+            icon: 'error',
+            title: 'ข้อผิดพลาด',
+            text: `จำนวนสินค้า "${item.name}" ต้องไม่เกิน ${item.stock}`,
+            footer: 'กรุณาเลือกจำนวนที่ถูกต้อง'
+          });
           existingItem.qty = item.stock;
         }
       } else {
@@ -551,7 +587,12 @@
 
     function showOrderForm() {
       if (cart.length === 0) {
-        Swal.fire('ข้อผิดพลาด', 'ตะกร้าว่าง กรุณาเพิ่มสินค้าก่อนสั่งซื้อ', 'error');
+        Swal.fire({
+          icon: 'error',
+          title: 'ข้อผิดพลาด',
+          text: 'ตะกร้าว่าง กรุณาเพิ่มสินค้าก่อนสั่งซื้อ',
+          footer: 'เลือกสินค้าจากกลุ่มสินค้าหรือร้านค้า'
+        });
         return;
       }
       if (!userLineId) {
@@ -578,17 +619,32 @@
       };
 
       if (!orderData.customerName || !orderData.phone || !orderData.location) {
-        Swal.fire('ข้อผิดพลาด', 'กรุณากรอกข้อมูลให้ครบ (ชื่อ, เบอร์โทร, พิกัด)', 'error');
+        Swal.fire({
+          icon: 'error',
+          title: 'ข้อผิดพลาด',
+          text: 'กรุณากรอกข้อมูลให้ครบ (ชื่อ, เบอร์โทร, พิกัด)',
+          footer: 'ตรวจสอบข้อมูลในฟอร์ม'
+        });
         return;
       }
 
       if (!/^\d{10}$/.test(orderData.phone)) {
-        Swal.fire('ข้อผิดพลาด', 'เบอร์โทรต้องเป็นตัวเลข 10 หลัก', 'error');
+        Swal.fire({
+          icon: 'error',
+          title: 'ข้อผิดพลาด',
+          text: 'เบอร์โทรต้องเป็นตัวเลข 10 หลัก',
+          footer: 'ตัวอย่าง: 0123456789'
+        });
         return;
       }
 
       if (!orderData.items.every(item => item.id && item.storeId && item.name && item.price >= 0 && item.qty > 0)) {
-        Swal.fire('ข้อผิดพลาด', 'ข้อมูลสินค้าในตะกร้าไม่ถูกต้อง', 'error');
+        Swal.fire({
+          icon: 'error',
+          title: 'ข้อผิดพลาด',
+          text: 'ข้อมูลสินค้าในตะกร้าไม่ถูกต้อง',
+          footer: 'กรุณารีเซ็ตตะกร้าและเพิ่มสินค้าใหม่'
+        });
         return;
       }
 
