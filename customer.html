@@ -244,11 +244,11 @@
     const cartModal = new bootstrap.Modal(document.getElementById('cartModal'));
     const orderModal = new bootstrap.Modal(document.getElementById('orderModal'));
     // Replace with your actual Google Apps Script Web App URL
-    const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbyl-6GYBusKgWF0akTdQAKoi3ZonOjJ78cycIUkfnP2AhRIlBOSOYxVxVtNYIM266qB/exec'; // e.g., https://script.google.com/macros/s/.../exec
+    const appsScriptUrl = 'https://script.google.com/macros/s/AKfycby6RsbLF9muNXaw0S4Njo7pI9EISuR7o92lLTOHYTlMxemzcbOq0HSpGxmmck4fMsv7/exec'; // e.g., https://script.google.com/macros/s/AKfycbw.../exec
 
     // Validate appsScriptUrl
-    if (appsScriptUrl === 'https://script.google.com/macros/s/AKfycbyl-6GYBusKgWF0akTdQAKoi3ZonOjJ78cycIUkfnP2AhRIlBOSOYxVxVtNYIM266qB/exec') {
-      Swal.fire('ข้อผิดพลาด', 'กรุณาใส่ URL ของ Google Apps Script Web App ในตัวแปร appsScriptUrl', 'error');
+    if (appsScriptUrl === 'https://script.google.com/macros/s/AKfycby6RsbLF9muNXaw0S4Njo7pI9EISuR7o92lLTOHYTlMxemzcbOq0HSpGxmmck4fMsv7/exec' || appsScriptUrl === 'https://script.google.com/macros/s/AKfycby6RsbLF9muNXaw0S4Njo7pI9EISuR7o92lLTOHYTlMxemzcbOq0HSpGxmmck4fMsv7/exec') {
+      Swal.fire('ข้อผิดพลาด', 'กรุณาใส่ URL จริงของ Google Apps Script Web App ในตัวแปร appsScriptUrl', 'error');
       throw new Error('Invalid appsScriptUrl');
     }
 
