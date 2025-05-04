@@ -243,8 +243,7 @@
     let userLineId = '';
     const cartModal = new bootstrap.Modal(document.getElementById('cartModal'));
     const orderModal = new bootstrap.Modal(document.getElementById('orderModal'));
-    // const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbzdXgIYmN-6EogtM2UqqevQTw3hSZ75DzoTu-Gl4AwKkturKSDg1MrUuViJCzW6DZG4/exec';
-    const appsScriptUrl = 'https://cors-proxy.app-mdu25.workers.dev/'; // แทนที่ด้วย URL จาก Web App Deployment
+    const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbwAtGBjn3rS1edGmYigIep_9cC3MqgGvGfMa1VmbRs-8A3rBnUzizodryKTZysTgPZR/exec'; // ใช้ URL เดิมของ Web App
 
     function showSpinner() { document.getElementById('spinner').style.display = 'block'; }
     function hideSpinner() { document.getElementById('spinner').style.display = 'none'; }
@@ -252,7 +251,7 @@
     // Initialize LIFF
     async function initializeLiff() {
       try {
-        await liff.init({ liffId: '2007361885-2A7QmoJ4' }); // แทนที่ด้วย LIFF ID จาก LINE Developers Console
+        await liff.init({ liffId: '2007361885-2A7QmoJ4' });
         if (!liff.isLoggedIn()) {
           document.getElementById('lineLoginBtn').style.display = 'block';
           document.getElementById('lineLoginBtn').onclick = () => liff.login();
@@ -293,6 +292,9 @@
       try {
         showSpinner();
         const response = await fetch(`${appsScriptUrl}?action=getSheetData&sheetName=${sheetName}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
         const data = await response.json();
         if (data.error) throw new Error(data.error);
         return data;
@@ -476,11 +478,25 @@
 
       showSpinner();
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // Timeout 10 วินาที
         const response = await fetch(appsScriptUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'saveOrder', data: orderData })
+          body: JSON.stringify({ action: 'saveOrder', data: orderData }),
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
+        if (!response.ok) {
+          console.warn(`HTTP error! Status: ${response.status}`);
+          Swal.fire('คำเตือน', 'การสั่งซื้ออาจสำเร็จ แต่ไม่สามารถยืนยันได้ กรุณาตรวจสอบใน Google Sheet หรือ LINE', 'warning');
+          resetCart();
+          document.getElementById('customerName').value = '';
+          document.getElementById('phone').value = '';
+          document.getElementById('location').value = '';
+          orderModal.hide();
+          return;
+        }
         const result = await response.json();
         if (result.error) throw new Error(result.error);
         Swal.fire('สำเร็จ', `คำสั่งซื้อ #${result.orderId} ส่งแล้ว!`, 'success');
@@ -490,7 +506,13 @@
         document.getElementById('location').value = '';
         orderModal.hide();
       } catch (err) {
-        Swal.fire('ข้อผิดพลาด', err.message || 'ไม่สามารถส่งคำสั่งซื้อได้', 'error');
+        console.error('Error:', err);
+        Swal.fire('คำเตือน', 'การสั่งซื้ออาจสำเร็จ กรุณาตรวจสอบใน Google Sheet หรือ LINE', 'warning');
+        resetCart();
+        document.getElementById('customerName').value = '';
+        document.getElementById('phone').value = '';
+        document.getElementById('location').value = '';
+        orderModal.hide();
       } finally {
         hideSpinner();
       }
@@ -502,5 +524,6 @@
       getCustomerLocation();
     };
   </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93a44527498f7bc3',t:'MTc0NjMyMjYxNy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
