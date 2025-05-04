@@ -176,16 +176,15 @@
     <h3 class="section-title">เลือกวิธีการเลือกซื้อ</h3>
     <div id="initialSelection" class="initial-selection mb-5">
       <div class="selection-card" onclick="showCategories()">
-        <img src="https://img5.pic.in.th/file/secure-sv1/select-product.png" alt="กลุ่มสินค้า" onerror="this.src='https://via.placeholder.com/200x200?text=Image+Error'; this.onerror=null;">
+        <img src="https://img5.pic.in.th/file/secure-sv1/select-product.png" alt="กลุ่มสินค้า">
         <div class="card-body text-center fw-bold">เลือกตามกลุ่มสินค้า</div>
       </div>
       <div class="selection-card" onclick="showStores()">
-        <img src="https://img2.pic.in.th/pic/select-store.png" alt="ร้านค้า" onerror="this.src='https://via.placeholder.com/200x200?text=Image+Error'; this.onerror=null;">
+        <img src="https://img2.pic.in.th/pic/select-store.png" alt="ร้านค้า">
         <div class="card-body text-center fw-bold">เลือกตามร้านค้า</div>
       </div>
     </div>
 
-    <button class="btn btn-secondary mb-3" onclick="backToInitial()" style="display: none;" id="backButton">กลับไปหน้าเลือกซื้อ</button>
     <div id="selectionGrid" class="selection-grid" style="display: none;"></div>
     <div id="productGrid" class="product-grid" style="display: none;"></div>
 
@@ -244,81 +243,16 @@
     let userLineId = '';
     const cartModal = new bootstrap.Modal(document.getElementById('cartModal'));
     const orderModal = new bootstrap.Modal(document.getElementById('orderModal'));
-    const appsScriptUrl = 'https://cors-proxy.app-mdu25.workers.dev';
-
-    // Validate appsScriptUrl
-    if (!appsScriptUrl || typeof appsScriptUrl !== 'string' || appsScriptUrl.trim() === '') {
-      Swal.fire({
-        icon: 'error',
-        title: 'ข้อผิดพลาด',
-        text: 'URL ของ CORS Proxy ไม่ถูกต้อง กรุณาตรวจสอบตัวแปร appsScriptUrl ในโค้ด',
-        footer: 'ติดต่อผู้ดูแลระบบหากปัญหายังคงอยู่'
-      });
-      throw new Error('Invalid appsScriptUrl');
-    }
+    // const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbzdXgIYmN-6EogtM2UqqevQTw3hSZ75DzoTu-Gl4AwKkturKSDg1MrUuViJCzW6DZG4/exec';
+    const appsScriptUrl = 'https://cors-proxy.app-mdu25.workers.dev/'; // แทนที่ด้วย URL จาก Web App Deployment
 
     function showSpinner() { document.getElementById('spinner').style.display = 'block'; }
     function hideSpinner() { document.getElementById('spinner').style.display = 'none'; }
 
-    // Test Apps Script URL
-    async function testAppsScriptUrl() {
-      try {
-        const response = await fetch(`${appsScriptUrl}?action=testDeployment`, { method: 'GET' });
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        const data = await response.json();
-        if (!data || data.error || !data.includes('Deployment is working')) throw new Error('CORS Proxy หรือ Web App ไม่ทำงานตามที่คาดไว้');
-        console.log('CORS Proxy and Apps Script Web App are accessible');
-      } catch (err) {
-        Swal.fire({
-          icon: 'error',
-          title: 'ข้อผิดพลาด',
-          text: `ไม่สามารถเชื่อมต่อกับ CORS Proxy หรือ Google Apps Script: ${err.message}`,
-          footer: 'กรุณาตรวจสอบ URL หรือการตั้งค่า CORS Proxy'
-        });
-        console.error('TestAppsScriptUrl Error:', err);
-      }
-    }
-
-    // Fetch with retry and improved error handling
-    async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
-      for (let i = 0; i < retries; i++) {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 15000);
-          const response = await fetch(url, { ...options, signal: controller.signal });
-          clearTimeout(timeoutId);
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-          }
-
-          const contentType = response.headers.get('Content-Type');
-          if (!contentType || !contentType.includes('application/json')) {
-            throw new Error('Invalid response: Expected JSON');
-          }
-
-          return response;
-        } catch (err) {
-          if (i === retries - 1) {
-            console.error(`Failed fetch to ${url} with options:`, options, 'Error:', err);
-            let errorMessage = err.message;
-            if (err.message.includes('Failed to fetch')) {
-              errorMessage = 'ไม่สามารถเชื่อมต่อกับ CORS Proxy กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตหรือ URL';
-            } else if (err.message.includes('aborted')) {
-              errorMessage = 'คำขอหมดเวลา กรุณาลองใหม่';
-            }
-            throw new Error(`ล้มเหลวหลังจากพยายาม ${retries} ครั้งสำหรับ URL ${url}: ${errorMessage}`);
-          }
-          console.warn(`Fetch attempt ${i + 1} failed: ${err.message}. Retrying...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-    }
-
     // Initialize LIFF
     async function initializeLiff() {
       try {
-        await liff.init({ liffId: '2007361885-2A7QmoJ4' });
+        await liff.init({ liffId: '2007361885-2A7QmoJ4' }); // แทนที่ด้วย LIFF ID จาก LINE Developers Console
         if (!liff.isLoggedIn()) {
           document.getElementById('lineLoginBtn').style.display = 'block';
           document.getElementById('lineLoginBtn').onclick = () => liff.login();
@@ -329,13 +263,7 @@
           document.getElementById('lineId').value = userLineId;
         }
       } catch (e) {
-        Swal.fire({
-          icon: 'error',
-          title: 'ข้อผิดพลาด',
-          text: 'ไม่สามารถเริ่มต้น LIFF ได้: ' + e.message,
-          footer: 'กรุณาตรวจสอบ LIFF ID หรือการเชื่อมต่อ'
-        });
-        console.error('InitializeLiff Error:', e);
+        Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเริ่มต้น LIFF ได้: ' + e.message, 'error');
       }
     }
 
@@ -349,24 +277,14 @@
             hideSpinner();
           },
           error => {
-            Swal.fire({
-              icon: 'warning',
-              title: 'ข้อผิดพลาด',
-              text: 'ไม่สามารถดึงพิกัดได้ กรุณากรอกเอง',
-              footer: 'ตรวจสอบการอนุญาตตำแหน่งในเบราว์เซอร์'
-            });
+            Swal.fire('ข้อผิดพลาด', 'ไม่สามารถดึงพิกัดได้ กรุณากรอกเอง', 'warning');
             document.getElementById('location').value = '';
             hideSpinner();
           },
           { timeout: 10000, enableHighAccuracy: true }
         );
       } else {
-        Swal.fire({
-          icon: 'error',
-          title: 'ข้อผิดพลาด',
-          text: 'เบราว์เซอร์ไม่รองรับ Geolocation',
-          footer: 'กรุณากรอกพิกัดด้วยตนเอง'
-        });
+        Swal.fire('ข้อผิดพลาด', 'เบราว์เซอร์ไม่รองรับ Geolocation', 'error');
         document.getElementById('location').value = '';
       }
     }
@@ -374,42 +292,12 @@
     async function fetchSheetData(sheetName) {
       try {
         showSpinner();
-        const response = await fetchWithRetry(`${appsScriptUrl}?action=getSheetData&sheetName=${sheetName}`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' }
-        });
+        const response = await fetch(`${appsScriptUrl}?action=getSheetData&sheetName=${sheetName}`);
         const data = await response.json();
-        console.log(`Fetched data for sheet "${sheetName}":`, data);
-        if (data.error) {
-          throw new Error(data.error);
-        }
-        if (!Array.isArray(data) || data.length <= 1) {
-          console.warn(`Sheet "${sheetName}" is empty or contains only headers`);
-          return [];
-        }
-        if (sheetName === 'Promotions' && data[0][0] !== 'PromoID') {
-          console.warn(`Sheet "${sheetName}" has unexpected header:`, data[0]);
-          throw new Error(`โครงสร้างชีต "${sheetName}" ไม่ถูกต้อง คาดหวังส่วนหัว "PromoID"`);
-        }
+        if (data.error) throw new Error(data.error);
         return data;
       } catch (err) {
-        console.error(`FetchSheetData Error for ${sheetName}:`, err);
-        let errorMessage = err.message;
-        if (err.message.includes('Sheet') && err.message.includes('not found')) {
-          errorMessage = `ไม่พบชีต "${sheetName}" ใน Google Sheet กรุณาตรวจสอบชื่อชีตและการตั้งค่า`;
-        } else if (err.message.includes('HTTP error') || err.message.includes('ไม่สามารถเชื่อมต่อ')) {
-          errorMessage = `ไม่สามารถเชื่อมต่อกับ CORS Proxy หรือ Google Apps Script: ${err.message}. กรุณาตรวจสอบ URL หรือการตั้งค่า CORS Proxy`;
-        } else if (err.message.includes('Invalid response')) {
-          errorMessage = `การตอบกลับจากเซิร์ฟเวอร์ไม่ถูกต้อง กรุณาตรวจสอบ CORS Proxy หรือ Google Apps Script`;
-        } else if (err.message.includes('โครงสร้างชีต')) {
-          errorMessage = err.message;
-        }
-        Swal.fire({
-          icon: 'error',
-          title: 'ข้อผิดพลาด',
-          text: errorMessage,
-          footer: `URL: ${appsScriptUrl}<br>ติดต่อผู้ดูแลระบบหากปัญหายังคงอยู่`
-        });
+        Swal.fire('ข้อผิดพลาด', err.message || 'ไม่สามารถโหลดข้อมูลได้', 'error');
         return [];
       } finally {
         hideSpinner();
@@ -417,76 +305,60 @@
     }
 
     async function loadInitialData() {
-      try {
-        const promoData = await fetchSheetData('Promotions');
-        document.getElementById('promoContent').innerHTML = promoData.length > 1 ? 
-          promoData.slice(1).map((p, idx) => {
-            const title = p[1] || 'ไม่มีชื่อ';
-            const desc = p[2] || 'ไม่มีรายละเอียด';
-            let img = p[3] || 'https://via.placeholder.com/300x150?text=ไม่มีรูปภาพ';
-            if (!img.startsWith('http://') && !img.startsWith('https://')) {
-              console.warn(`Invalid image URL for promotion "${title}": ${img}`);
-              img = 'https://via.placeholder.com/300x150?text=Invalid+Image+URL';
-            }
-            return `<div class="carousel-item ${idx === 0 ? 'active' : ''}">
-                    <img src="${img}" class="d-block w-100" alt="${title}" onerror="this.src='https://via.placeholder.com/300x150?text=Image+Error'; this.onerror=null;">
-                    <div class="carousel-caption d-none d-md-block">
-                    <h5>${title}</h5>
-                    <p>${desc}</p>
-                    </div></div>`;
-          }).join('') : '<div class="carousel-item active"><p class="text-center py-5">ไม่มีโปรโมชั่นในขณะนี้</p></div>';
-      } catch (err) {
-        console.error('LoadInitialData Error:', err);
-        document.getElementById('promoContent').innerHTML = '<div class="carousel-item active"><p class="text-center py-5">ไม่สามารถโหลดโปรโมชั่นได้ กรุณาตรวจสอบ Google Sheet หรือการเชื่อมต่อ</p></div>';
-      }
+      const promoData = await fetchSheetData('Promotions');
+      document.getElementById('promoContent').innerHTML = promoData.length > 1 ? 
+        promoData.slice(1).map((p, idx) => {
+          const title = p[1] || 'ไม่มีชื่อ';
+          const desc = p[2] || 'ไม่มีรายละเอียด';
+          const img = p[3] || 'https://via.placeholder.com/300x150?text=ไม่มีรูปภาพ';
+          return `<div class="carousel-item ${idx === 0 ? 'active' : ''}">
+                  <img src="${img}" class="d-block w-100" alt="${title}">
+                  <div class="carousel-caption d-none d-md-block">
+                  <h5>${title}</h5>
+                  <p>${desc}</p>
+                  </div></div>`;
+        }).join('') : '<div class="carousel-item active"><p class="text-center py-5">ไม่มีโปรโมชั่น</p></div>';
     }
 
     async function showCategories() {
       document.getElementById('initialSelection').style.display = 'none';
       document.getElementById('selectionGrid').style.display = 'grid';
       document.getElementById('productGrid').style.display = 'none';
-      document.getElementById('backButton').style.display = 'block';
       const categoryData = await fetchSheetData('Categories');
       document.getElementById('selectionGrid').innerHTML = categoryData.length > 1 ? 
         categoryData.slice(1).map(c => {
           let imageUrl = c[2] && c[2].trim() !== '' ? c[2] : 'https://via.placeholder.com/200x200?text=No+Image';
           if (imageUrl.includes('drive.google.com/file/d/')) {
-            const fileIdMatch = imageUrl.match(/file\/d\/(.+?)(?:\/|$)/);
-            if (fileIdMatch && fileIdMatch[1]) {
-              imageUrl = 'https://drive.google.com/uc?export=view&id=' + fileIdMatch[1];
-            } else {
-              imageUrl = 'https://via.placeholder.com/200x200?text=Invalid+Drive+URL';
-            }
+            const fileIdMatch = imageUrl.match(/file\/d\/(.+?)\//);
+            if (fileIdMatch && fileIdMatch[1]) imageUrl = 'https://drive.google.com/uc?export=view&id=' + fileIdMatch[1];
           }
           return `<div class="selection-card" onclick="loadProductsByCategory('${c[0]}')">
-                  <img src="${imageUrl}" alt="${c[1]}" onerror="this.src='https://via.placeholder.com/200x200?text=Image+Error'; this.onerror=null;">
+                  <img src="${imageUrl}" alt="${c[1]}" onerror="this.src='https://via.placeholder.com/200x200?text=Image+Error'">
                   <div class="card-body"><h6 class="card-title">${c[1]}</h6></div></div>`;
-        }).join('') : '<p class="text-center">ไม่มีกลุ่มสินค้าในขณะนี้</p>';
+        }).join('') : '<p class="text-center">ไม่มีกลุ่มสินค้า</p>';
     }
 
     async function showStores() {
       document.getElementById('initialSelection').style.display = 'none';
       document.getElementById('selectionGrid').style.display = 'grid';
       document.getElementById('productGrid').style.display = 'none';
-      document.getElementById('backButton').style.display = 'block';
       const storeData = await fetchSheetData('Stores');
       document.getElementById('selectionGrid').innerHTML = storeData.length > 1 ? 
         storeData.slice(1).map(s => {
           return `<div class="selection-card" onclick="loadProductsByStore('${s[0]}')">
-                  <img src="${s[2]}" alt="${s[1]}" onerror="this.src='https://via.placeholder.com/200x200?text=Image+Error'; this.onerror=null;">
+                  <img src="${s[2]}" alt="${s[1]}" onerror="this.src='https://via.placeholder.com/200x200?text=Image+Error'">
                   <div class="card-body"><h6 class="card-title">${s[1]}</h6></div></div>`;
-        }).join('') : '<p class="text-center">ไม่มีร้านค้าในขณะนี้</p>';
+        }).join('') : '<p class="text-center">ไม่มีร้านค้า</p>';
     }
 
     async function loadProductsByCategory(categoryId) {
       document.getElementById('selectionGrid').style.display = 'none';
       document.getElementById('productGrid').style.display = 'grid';
-      document.getElementById('backButton').style.display = 'block';
       const productData = await fetchSheetData('Products');
       document.getElementById('productGrid').innerHTML = productData.length > 1 ? 
         productData.slice(1).filter(p => p[2] === categoryId).map(p => {
           return `<div class="product-card">
-                  <img src="${p[5]}" alt="${p[3]}" onerror="this.src='https://via.placeholder.com/180x180?text=Image+Error'; this.onerror=null;">
+                  <img src="${p[5]}" alt="${p[3]}" onerror="this.src='https://via.placeholder.com/180x180?text=Image+Error'">
                   <div class="card-body">
                   <h5 class="card-title">${p[3]}</h5>
                   <p class="card-text">${p[4]} บาท</p>
@@ -501,12 +373,11 @@
     async function loadProductsByStore(storeId) {
       document.getElementById('selectionGrid').style.display = 'none';
       document.getElementById('productGrid').style.display = 'grid';
-      document.getElementById('backButton').style.display = 'block';
       const productData = await fetchSheetData('Products');
       document.getElementById('productGrid').innerHTML = productData.length > 1 ? 
         productData.slice(1).filter(p => p[1] === storeId).map(p => {
           return `<div class="product-card">
-                  <img src="${p[5]}" alt="${p[3]}" onerror="this.src='https://via.placeholder.com/180x180?text=Image+Error'; this.onerror=null;">
+                  <img src="${p[5]}" alt="${p[3]}" onerror="this.src='https://via.placeholder.com/180x180?text=Image+Error'">
                   <div class="card-body">
                   <h5 class="card-title">${p[3]}</h5>
                   <p class="card-text">${p[4]} บาท</p>
@@ -518,40 +389,18 @@
         }).join('') : '<p class="text-center">ไม่มีสินค้าในร้านนี้</p>';
     }
 
-    function backToInitial() {
-      document.getElementById('initialSelection').style.display = 'grid';
-      document.getElementById('selectionGrid').style.display = 'none';
-      document.getElementById('productGrid').style.display = 'none';
-      document.getElementById('backButton').style.display = 'none';
-    }
-
     function addToCart(item, qty) {
       qty = parseInt(qty);
       if (qty < 1 || qty > item.stock) {
-        Swal.fire({
-          icon: 'error',
-          title: 'ข้อผิดพลาด',
-          text: `จำนวนต้องอยู่ระหว่าง 1-${item.stock}`,
-          footer: 'กรุณาเลือกจำนวนที่ถูกต้อง'
-        });
+        Swal.fire('ข้อผิดพลาด', `จำนวนต้องอยู่ระหว่าง 1-${item.stock}`, 'error');
         return;
       }
       if (cart.length >= 10 && !cart.find(i => i.id === item.id)) {
-        Swal.fire({
-          icon: 'error',
-          title: 'ข้อผิดพลาด',
-          text: 'ตะกร้าเต็ม (สูงสุด 10 รายการ)',
-          footer: 'กรุณาลบสินค้าบางรายการหรือรีเซ็ตตะกร้า'
-        });
+        Swal.fire('ข้อผิดพลาด', 'ตะกร้าเต็ม (สูงสุด 10 รายการ)', 'error');
         return;
       }
       if (cart.length > 0 && cart[0].storeId !== item.storeId) {
-        Swal.fire({
-          icon: 'error',
-          title: 'ข้อผิดพลาด',
-          text: 'กรุณาสั่งซื้อจากร้านเดียวกันเท่านั้น',
-          footer: 'กรุณารีเซ็ตตะกร้าเพื่อสั่งซื้อจากร้านใหม่'
-        });
+        Swal.fire('ข้อผิดพลาด', 'กรุณาสั่งซื้อจากร้านเดียวกันเท่านั้น', 'error');
         return;
       }
 
@@ -559,12 +408,7 @@
       if (existingItem) {
         existingItem.qty += qty;
         if (existingItem.qty > item.stock) {
-          Swal.fire({
-            icon: 'error',
-            title: 'ข้อผิดพลาด',
-            text: `จำนวนสินค้า "${item.name}" ต้องไม่เกิน ${item.stock}`,
-            footer: 'กรุณาเลือกจำนวนที่ถูกต้อง'
-          });
+          Swal.fire('ข้อผิดพลาด', `จำนวนสินค้า "${item.name}" ต้องไม่เกิน ${item.stock}`, 'error');
           existingItem.qty = item.stock;
         }
       } else {
@@ -599,21 +443,11 @@
 
     function showOrderForm() {
       if (cart.length === 0) {
-        Swal.fire({
-          icon: 'error',
-          title: 'ข้อผิดพลาด',
-          text: 'ตะกร้าว่าง กรุณาเพิ่มสินค้าก่อนสั่งซื้อ',
-          footer: 'เลือกสินค้าจากกลุ่มสินค้าหรือร้านค้า'
-        });
+        Swal.fire('ข้อผิดพลาด', 'ตะกร้าว่าง กรุณาเพิ่มสินค้าก่อนสั่งซื้อ', 'error');
         return;
       }
       if (!userLineId) {
-        Swal.fire({
-          icon: 'error',
-          title: 'ข้อผิดพลาด',
-          text: 'กรุณาล็อกอินด้วย LINE ก่อนสั่งซื้อ',
-          footer: 'กำลังเปลี่ยนเส้นทางไปยังหน้าเข้าสู่ระบบ'
-        });
+        Swal.fire('ข้อผิดพลาด', 'กรุณาล็อกอินด้วย LINE ก่อนสั่งซื้อ', 'error');
         liff.login();
         return;
       }
@@ -631,86 +465,38 @@
       };
 
       if (!orderData.customerName || !orderData.phone || !orderData.location) {
-        Swal.fire({
-          icon: 'error',
-          title: 'ข้อผิดพลาด',
-          text: 'กรุณากรอกข้อมูลให้ครบ (ชื่อ, เบอร์โทร, พิกัด)',
-          footer: 'ตรวจสอบข้อมูลในฟอร์ม'
-        });
+        Swal.fire('ข้อผิดพลาด', 'กรุณากรอกข้อมูลให้ครบ (ชื่อ, เบอร์โทร, พิกัด)', 'error');
         return;
       }
 
       if (!/^\d{10}$/.test(orderData.phone)) {
-        Swal.fire({
-          icon: 'error',
-          title: 'ข้อผิดพลาด',
-          text: 'เบอร์โทรต้องเป็นตัวเลข 10 หลัก',
-          footer: 'ตัวอย่าง: 0123456789'
-        });
-        return;
-      }
-
-      if (!orderData.items.every(item => item.id && item.storeId && item.name && item.price >= 0 && item.qty > 0)) {
-        Swal.fire({
-          icon: 'error',
-          title: 'ข้อผิดพลาด',
-          text: 'ข้อมูลสินค้าในตะกร้าไม่ถูกต้อง',
-          footer: 'กรุณารีเซ็ตตะกร้าและเพิ่มสินค้าใหม่'
-        });
+        Swal.fire('ข้อผิดพลาด', 'เบอร์โทรต้องเป็นตัวเลข 10 หลัก', 'error');
         return;
       }
 
       showSpinner();
       try {
-        const response = await fetchWithRetry(appsScriptUrl, {
+        const response = await fetch(appsScriptUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'saveOrder', data: orderData })
         });
-
-        let result;
-        try {
-          result = await response.json();
-        } catch (e) {
-          throw new Error('Invalid JSON response from server');
-        }
-
-        if (result.error || !result.success || !result.orderId) {
-          throw new Error(result.error || 'การสั่งซื้อไม่สำเร็จ: ไม่ได้รับ orderId');
-        }
-
-        Swal.fire({
-          icon: 'success',
-          title: 'สำเร็จ',
-          text: `คำสั่งซื้อ #${result.orderId} ส่งแล้ว!`,
-          confirmButtonText: 'ตกลง'
-        });
+        const result = await response.json();
+        if (result.error) throw new Error(result.error);
+        Swal.fire('สำเร็จ', `คำสั่งซื้อ #${result.orderId} ส่งแล้ว!`, 'success');
         resetCart();
         document.getElementById('customerName').value = '';
         document.getElementById('phone').value = '';
         document.getElementById('location').value = '';
         orderModal.hide();
       } catch (err) {
-        console.error('SubmitOrder Error:', err);
-        Swal.fire({
-          icon: 'warning',
-          title: 'คำเตือน',
-          html: `การสั่งซื้ออาจสำเร็จ แต่ไม่สามารถยืนยันได้<br>กรุณาตรวจสอบใน Google Sheet หรือ LINE<br>ข้อผิดพลาด: ${err.message || 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์'}`,
-          confirmButtonText: 'ตกลง',
-          footer: 'หากปัญหายังคงอยู่ ติดต่อผู้ดูแลระบบ'
-        });
-        resetCart();
-        document.getElementById('customerName').value = '';
-        document.getElementById('phone').value = '';
-        document.getElementById('location').value = '';
-        orderModal.hide();
+        Swal.fire('ข้อผิดพลาด', err.message || 'ไม่สามารถส่งคำสั่งซื้อได้', 'error');
       } finally {
         hideSpinner();
       }
     }
 
     window.onload = async function() {
-      await testAppsScriptUrl();
       await initializeLiff();
       await loadInitialData();
       getCustomerLocation();
